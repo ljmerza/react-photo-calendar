@@ -1,4 +1,9 @@
-export type CalendarCell = { day: number } | null;
+export interface CalendarCell {
+  date: Date;
+  isoDate: string;
+  day: number;
+  inCurrentMonth: boolean;
+}
 
 export function parseMonthKey(value?: string): Date {
   if (!value) {
@@ -18,6 +23,10 @@ export function parseMonthKey(value?: string): Date {
   return new Date(Date.UTC(year, monthIndex, 1));
 }
 
+function toISODate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export function createCalendarCells(monthDate: Date, firstDayOfWeek: number): CalendarCell[] {
   const utcYear = monthDate.getUTCFullYear();
   const utcMonth = monthDate.getUTCMonth();
@@ -27,18 +36,22 @@ export function createCalendarCells(monthDate: Date, firstDayOfWeek: number): Ca
   const daysInMonth = new Date(Date.UTC(utcYear, utcMonth + 1, 0)).getUTCDate();
   const totalCells = Math.ceil((leadingPlaceholders + daysInMonth) / 7) * 7;
 
-  return Array.from<CalendarCell>({ length: totalCells }, (_, index) => {
-    if (index < leadingPlaceholders) {
-      return null;
-    }
+  const firstVisible = new Date(Date.UTC(utcYear, utcMonth, 1 - leadingPlaceholders));
+  const cells: CalendarCell[] = [];
 
-    const dayNumber = index - leadingPlaceholders + 1;
-    if (dayNumber > daysInMonth) {
-      return null;
-    }
+  for (let index = 0; index < totalCells; index += 1) {
+    const date = new Date(
+      Date.UTC(firstVisible.getUTCFullYear(), firstVisible.getUTCMonth(), firstVisible.getUTCDate() + index)
+    );
+    cells.push({
+      date,
+      isoDate: toISODate(date),
+      day: date.getUTCDate(),
+      inCurrentMonth: date.getUTCMonth() === utcMonth
+    });
+  }
 
-    return { day: dayNumber };
-  });
+  return cells;
 }
 
 export function formatMonthKey(date: Date): string {
@@ -50,4 +63,16 @@ export function addMonths(date: Date, offset: number): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1));
 }
 
-export const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+export function getVisibleRange(cells: CalendarCell[]): { start: Date; end: Date } | null {
+  if (cells.length === 0) {
+    return null;
+  }
+
+  const start = cells[0].date;
+  const end = cells[cells.length - 1].date;
+
+  return {
+    start: new Date(start.getTime()),
+    end: new Date(end.getTime())
+  };
+}

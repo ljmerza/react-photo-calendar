@@ -8,7 +8,6 @@ and reference playground.
 ## Getting started
 
 ```bash
-cd photo-calendar
 npm install
 npm run dev
 ```
@@ -37,9 +36,10 @@ Use the optional `firstDayOfWeek` prop (0 = Sunday, 1 = Monday, …) to align th
 placeholder grid with your locale while the production-ready date math evolves.
 
 Navigation arrows appear on pointer/desktop contexts. Pass `monthKey` +
-`onMonthChange` to control the current month externally, or use
-`defaultMonthKey` and let the placeholder manage its internal month state while
-still receiving navigation callbacks.
+`onMonthChange` (and optionally `onYearChange` when you need to react
+specifically to the year controls) to control the current month externally, or
+use `defaultMonthKey` and let the placeholder manage its internal month state
+while still receiving navigation callbacks.
 
 Use `onDaySelect` to react when users click a day; the handler receives both the
 ISO date string and the corresponding `Date` instance so consuming apps can hook
