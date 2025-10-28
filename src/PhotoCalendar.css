@@ -145,7 +145,7 @@
 }
 
 .calendar-cell {
-  min-height: 120px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   display: flex;
   justify-content: center;
