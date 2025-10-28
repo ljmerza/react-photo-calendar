@@ -1,4 +1,12 @@
-import { PhotoCalendar, type PhotoEntry } from '@tinybeans/photo-calendar';
+import {
+  PhotoCalendar,
+  PhotoCalendarRoot,
+  PhotoCalendarWeekdays,
+  PhotoCalendarMonthGrid,
+  PhotoCalendarDay,
+  usePhotoCalendarContext,
+  type PhotoEntry
+} from '@tinybeans/photo-calendar';
 
 // Generate sample photo entries for demonstration
 // Using various image sizes to show object-fit: cover working properly
@@ -33,12 +41,57 @@ const generateSampleEntries = (): PhotoEntry[] => {
   });
 };
 
+function CustomNavigation() {
+  const { navigation, monthLabel } = usePhotoCalendarContext('CustomNavigation');
+
+  return (
+    <div className="custom-nav">
+      <button type="button" onClick={() => navigation.navigateMonth(-1)}>
+        ◀ Prev
+      </button>
+      <strong>{monthLabel}</strong>
+      <button type="button" onClick={() => navigation.navigateMonth(1)}>
+        Next ▶
+      </button>
+      <button type="button" onClick={navigation.goToToday}>
+        Today
+      </button>
+    </div>
+  );
+}
+
 export function App() {
   const sampleEntries = generateSampleEntries();
 
   return (
     <main>
-      <PhotoCalendar entries={sampleEntries} />
+      <PhotoCalendar
+        entries={sampleEntries}
+        renderDay={(props) => (
+          <PhotoCalendarDay
+            day={{
+              ...props,
+              defaultContent: (
+                <div className={`day-wrapper ${props.isToday ? 'day-wrapper--today' : ''}`}>
+                  {props.defaultContent}
+                </div>
+              )
+            }}
+          />
+        )}
+      />
+      <section>
+        <h2>Custom navigation demo</h2>
+        <PhotoCalendarRoot entries={sampleEntries}>
+          {(state) => (
+            <div role="grid" aria-label={`Photo calendar for ${state.monthLabel}`} data-view="calendar">
+              <CustomNavigation />
+              <PhotoCalendarWeekdays />
+              <PhotoCalendarMonthGrid />
+            </div>
+          )}
+        </PhotoCalendarRoot>
+      </section>
     </main>
   );
 }

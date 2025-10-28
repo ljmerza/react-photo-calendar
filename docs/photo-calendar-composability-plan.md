@@ -6,9 +6,10 @@
 - Preserve current functionality and accessibility guarantees as defaults, with a clear migration path for existing users.
 
 ## Current State
-- `PhotoCalendar` renders markup and behavior together; critical controls like navigation buttons, month chips, and day cells live inside the component with hardwired HTML and classes.
-- Customization is limited to `renderDayContent`, `children`, and CSS overrides.
-- Tests focus on the monolithic component, making future refactors risky without broader coverage.
+- `PhotoCalendar` now composes headless primitives (`PhotoCalendarRoot`, `PhotoCalendarNavigation`, `PhotoCalendarWeekdays`, `PhotoCalendarMonthGrid`) while keeping the legacy props intact.
+- Consumers can override navigation, weekday headers, and day rendering via render props (`renderNavigation`, `renderWeekdays`, `renderDay`) or build entirely custom shells with the primitives and context hook.
+- Design tokens exposed through CSS variables allow theming without touching JSX.
+- Optional helper components such as `PhotoCalendarDay` expose the default button markup for consumers who want partial overrides without rebuilding accessibility wiring.
 
 ## Guiding Principles
 - **Headless-first**: expose state and callbacks via hooks/context so UI can be composed anywhere in the tree.
@@ -35,7 +36,7 @@
 4. **Render-prop override API**
    - Provide dedicated render props (`renderNavigation`, `renderMonthChip`, `renderDay`, etc.) that receive typed context objects and callback helpers.
    - Re-export TypeScript interfaces for each render context (e.g., `NavigationRenderProps`, `DayRenderProps`) to guide consumers on available data and required behaviors.
-   - Offer optional helper components (e.g., `DefaultNavigationButton`) for teams that want to mix and match default pieces with custom markup.
+   - Offer optional helper components (e.g., `PhotoCalendarDay`) for teams that want to mix and match default pieces with custom markup.
 
 5. **Styling strategy**
    - Provide minimal CSS tokens via CSS variables for the default skin plus a published design token map (`calendar.color.surface`, `calendar.radius.day`, etc.).
@@ -56,25 +57,10 @@
    - Introduce `PhotoCalendarRoot` and migrate existing component to consume it internally.
    - Ensure `PhotoCalendar` export remains backward-compatible.
 
-3. **Composable navigation (Week 3)**
-   - Split `CalendarBanner` into headless navigation primitives.
-   - Introduce render-prop slots for navigation buttons and month chips.
-   - Update tests to assert custom button rendering via render props.
-
-4. **Day cell composability (Week 4)**
-   - Create `PhotoCalendarMonthGrid` and `PhotoCalendarDay` primitives.
-   - Support custom day container markup via render props while preserving default button styling as an opt-in helper.
-   - Maintain `renderDayContent` for content overrides; introduce unified `renderDay` slot that can delegate to existing content helpers.
-
-5. **Docs & examples (Week 5)**
-   - Update README with composability examples (custom buttons, Tailwind styling, token usage).
-   - Build Storybook or example app scenarios demonstrating swapped components.
-   - Capture migration notes for consumers upgrading from v0.x.
-
-6. **Hardening (Week 6)**
-   - Finalize typing, ensure tree-shakable entry points.
-   - Audit accessibility with custom render-prop implementations.
-   - Prepare release notes and changelog entry.
+- (✅) **Composable navigation**: render-prop slots for navigation buttons/month chips ship in `PhotoCalendarNavigation`, with examples documented in the README.
+- (✅) **Day cell composability**: `PhotoCalendarMonthGrid` render prop + `renderDay`/`renderDayContent` hooks support custom wrappers while reusing thumbnail defaults.
+- (✅) **Docs & examples**: README + dedicated docs outline render prop contracts and token usage; example app demonstrates custom navigation.
+- (In progress) **Hardening**: Type exports aligned; accessibility and testing updates remain to be completed.
 
 ## Risks & Mitigations
 - **Breaking changes**: mitigate by keeping `PhotoCalendar` wrapper API stable and releasing in a minor version with opt-in overrides.
@@ -88,7 +74,7 @@
 - **Theming guidance**: publish design tokens/theme contracts alongside CSS variables. Offering a token map accelerates adoption for teams with established theming systems while still allowing lightweight usage via vanilla CSS variables.
 
 ## Next Steps
-- Validate milestone timelines with stakeholders.
-- Document the render-prop override contract (props, memoization guidelines, usage examples).
-- Document initial token map and how to extend it within downstream design systems.
-- Start with extracting navigation overrides to deliver immediate value (custom button support) while the broader refactor continues.
+- Validate milestone timelines with stakeholders for remaining work (hardening + testing).
+- Flesh out render-prop guidance with memoization tips and anti-patterns in the main docs.
+- Establish Storybook or interactive examples showcasing multiple design systems plugged into the primitives.
+- Resume automated testing (Vitest) to cover context consumers and accessibility regressions before release.

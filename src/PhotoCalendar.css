@@ -1,3 +1,25 @@
+/* Default design tokens */
+:root {
+  --calendar-color-surface: #ffffff;
+  --calendar-color-surface-muted: #f4f4f5;
+  --calendar-color-text: #111827;
+  --calendar-color-text-muted: rgba(17, 24, 39, 0.6);
+  --calendar-color-accent: #007bff;
+  --calendar-color-accent-soft: rgba(0, 123, 255, 0.15);
+  --calendar-color-chip-bg: rgba(0, 0, 0, 0.08);
+  --calendar-color-chip-active-bg: rgba(0, 123, 255, 0.12);
+  --calendar-color-chip-active-text: #0051a8;
+  --calendar-color-day-label-bg: rgba(0, 0, 0, 0.4);
+  --calendar-color-overflow-bg: rgba(0, 0, 0, 0.7);
+  --calendar-radius-day: 8px;
+  --calendar-radius-chip: 16px;
+  --calendar-radius-button: 6px;
+  --calendar-shadow-today: 0 0 0 2px var(--calendar-color-accent-soft);
+  --calendar-spacing-gap: 0.1rem;
+  --calendar-font-size-weekday: 0.75rem;
+  --calendar-font-size-day: 0.85rem;
+}
+
 /* Calendar Banner Layout */
 .calendar-banner {
   display: flex;
@@ -17,14 +39,17 @@
 .calendar-year {
   font-size: 1.5rem;
   margin: 0;
+  color: var(--calendar-color-text);
 }
 
 .today-button {
   padding: 0.4rem 0.8rem;
   font-size: 0.875rem;
-  border-radius: 6px;
+  border-radius: var(--calendar-radius-button);
   font-weight: 500;
   transition: background 0.2s;
+  background: var(--calendar-color-surface-muted);
+  color: var(--calendar-color-text);
 }
 
 .today-button:disabled,
@@ -39,8 +64,9 @@
   justify-content: center;
   font-size: 1.5rem;
   padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--calendar-radius-button);
   transition: background 0.2s;
+  background: var(--calendar-color-surface-muted);
 }
 
 /* Mobile: Space buttons on sides */
@@ -68,19 +94,22 @@
   flex: 1;
   font-size: 1.25rem;
   text-align: center;
+  color: var(--calendar-color-text);
 }
 
 .month-chip {
   padding: 0.4rem 0.75rem;
   font-size: 0.875rem;
-  border-radius: 16px;
+  border-radius: var(--calendar-radius-chip);
   font-weight: 500;
   transition: all 0.2s;
   white-space: nowrap;
+  background: var(--calendar-color-chip-bg);
+  color: var(--calendar-color-text);
 }
 
 .month-chip:focus-visible {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--calendar-color-accent);
   outline-offset: 2px;
 }
 
@@ -99,6 +128,8 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  border-radius: var(--calendar-radius-button);
+  background: var(--calendar-color-surface-muted);
 }
 
 .nav-button-icon {
@@ -113,6 +144,7 @@
 .nav-button:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
+  color: var(--calendar-color-accent);
 }
 
 .nav-button:disabled {
@@ -167,32 +199,32 @@
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.1rem;
+  gap: var(--calendar-spacing-gap);
   margin-bottom: 0.4rem;
 }
 
 .calendar-weekday {
   text-transform: uppercase;
-  font-size: 0.75rem;
+  font-size: var(--calendar-font-size-weekday);
   letter-spacing: 0.1em;
   text-align: center;
   padding: 0.25rem 0;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--calendar-color-text-muted);
 }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.1rem;
+  gap: var(--calendar-spacing-gap);
 }
 
 .calendar-cell {
   aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  border-radius: var(--calendar-radius-day);
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: var(--calendar-font-size-day);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   position: relative;
@@ -211,7 +243,7 @@
   border-radius: 4px;
   font-weight: 600;
   font-size: 1rem;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--calendar-color-day-label-bg);
   color: #fff;
 }
 
@@ -234,7 +266,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
-  border-radius: 6px;
+  border-radius: var(--calendar-radius-day);
 }
 
 .calendar-cell-overflow {
@@ -246,7 +278,7 @@
   border-radius: 999px;
   font-weight: 600;
   color: #fff;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--calendar-color-overflow-bg);
 }
 
 .calendar-cell--placeholder {
@@ -254,6 +286,6 @@
 }
 
 .calendar-cell--today {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.35);
+  border-color: var(--calendar-color-accent);
+  box-shadow: var(--calendar-shadow-today);
 }
