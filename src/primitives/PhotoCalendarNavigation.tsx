@@ -32,22 +32,5 @@ export function PhotoCalendarNavigation({ children }: PhotoCalendarNavigationPro
     return <>{children(renderProps)}</>;
   }
 
-  return (
-    <CalendarBanner
-      currentYear={currentYear}
-      currentMonth={currentMonth}
-      monthLabel={monthLabel}
-      monthNames={monthNames}
-      onNavigateMonth={navigation.navigateMonth}
-      onNavigateYear={navigation.navigateYear}
-      onNavigateToMonth={navigation.navigateToMonth}
-      onGoToToday={navigation.goToToday}
-      canNavigatePrevMonth={navigation.canNavigatePrevMonth}
-      canNavigateNextMonth={navigation.canNavigateNextMonth}
-      canNavigatePrevYear={navigation.canNavigatePrevYear}
-      canNavigateNextYear={navigation.canNavigateNextYear}
-      isMonthDisabled={navigation.isMonthDisabled}
-      isTodayDisabled={navigation.isTodayDisabled}
-    />
-  );
+  return <CalendarBanner />;
 }

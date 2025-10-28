@@ -76,5 +76,5 @@
 ## Next Steps
 - Validate milestone timelines with stakeholders for remaining work (hardening + testing).
 - Flesh out render-prop guidance with memoization tips and anti-patterns in the main docs.
-- Establish Storybook or interactive examples showcasing multiple design systems plugged into the primitives.
+- Expand the Storybook catalogue with multiple design-system skins and interaction scenarios (keyboard navigation, range loading, etc.).
 - Resume automated testing (Vitest) to cover context consumers and accessibility regressions before release.

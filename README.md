@@ -12,10 +12,11 @@ npm install
 npm run dev
 ```
 
-The dev command launches a local playground powered by Vite so contributors can
-experiment with the headless primitives. The `build` script bundles the library
-in ESM and CJS formats and emits TypeScript declarations that match the contract
-outlined in ADR-009.
+The Storybook dev server replaces the old Vite playground and hosts interactive
+examples for the headless primitives (`npm run storybook` is available as an explicit alias).
+See `docs/storybook-guide.md` for more details. The `build` script bundles the
+library in ESM and CJS formats and emits TypeScript declarations that match the
+contract outlined in ADR-009.
 
 ## Project layout
 
@@ -23,7 +24,8 @@ outlined in ADR-009.
 - `src/PhotoCalendar.tsx` – convenience component that composes the headless primitives with the reference UI.
 - `src/primitives/` – `PhotoCalendarRoot`, `PhotoCalendarNavigation`, `PhotoCalendarWeekdays`, `PhotoCalendarMonthGrid`, and `PhotoCalendarDay` headless building blocks.
 - `src/hooks/usePhotoCalendarState.ts` – shared state hook consumed by both the convenience component and primitives.
-- `example/` – local development harness powered by Vite (`example/main.tsx` is the dev entry point).
+- `.storybook/` – Storybook configuration powered by the React + Vite framework preset.
+- `src/stories/` – Storybook stories demonstrating the default calendar and headless compositions.
 - `vite.config.ts` – configures library builds and test environment defaults.
 
 ## Composing your own UI
@@ -34,21 +36,31 @@ The new primitives let you mix and match calendar state with custom controls:
 import {
   PhotoCalendarRoot,
   PhotoCalendarNavigation,
+  PhotoCalendarNavigationLayout,
+  PhotoCalendarNavigationControls,
+  PhotoCalendarNavigationPrevMonthButton,
+  PhotoCalendarNavigationMonthChips,
+  PhotoCalendarNavigationNextMonthButton,
+  PhotoCalendarNavigationTodayButton,
   PhotoCalendarWeekdays,
   PhotoCalendarMonthGrid,
+  PhotoCalendarDay,
   usePhotoCalendarContext,
 } from '@tinybeans/photo-calendar';
 
 function MyNavigation() {
-  const { navigation, monthLabel } = usePhotoCalendarContext('MyNavigation');
+  const { monthLabel } = usePhotoCalendarContext('MyNavigation');
 
   return (
-    <header>
-      <button onClick={() => navigation.navigateMonth(-1)}>◀</button>
-      <span>{monthLabel}</span>
-      <button onClick={() => navigation.navigateMonth(1)}>▶</button>
-      <button onClick={navigation.goToToday}>Today</button>
-    </header>
+    <PhotoCalendarNavigationLayout>
+      <PhotoCalendarNavigationControls>
+        <PhotoCalendarNavigationPrevMonthButton />
+        <PhotoCalendarNavigationNextMonthButton />
+        <PhotoCalendarNavigationTodayButton />
+        <span style={{ fontWeight: 600 }}>{monthLabel}</span>
+      </PhotoCalendarNavigationControls>
+      <PhotoCalendarNavigationMonthChips />
+    </PhotoCalendarNavigationLayout>
   );
 }
 
@@ -60,14 +72,24 @@ export function MyCalendar() {
           <MyNavigation />
           <PhotoCalendarWeekdays />
           <PhotoCalendarMonthGrid
-            renderDay={({ defaultContent, isToday, selectDay }) => (
-              <div
-                className={`my-day ${isToday ? 'my-day--today' : ''}`}
-                role="presentation"
-                onClick={selectDay}
-              >
-                {defaultContent}
-              </div>
+            renderDay={(props) => (
+              <PhotoCalendarDay
+                day={{
+                  ...props,
+                  defaultContent: (
+                    <div
+                      style={{
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        outline: props.isToday ? '2px solid #f97316' : 'none',
+                        outlineOffset: props.isToday ? '2px' : undefined
+                      }}
+                    >
+                      {props.defaultContent}
+                    </div>
+                  )
+                }}
+              />
             )}
           />
         </div>
@@ -79,6 +101,8 @@ export function MyCalendar() {
 
 Each primitive exposes render props so you can override just the pieces you need—see `docs/photo-calendar-render-props.md` for the full contract. If you prefer to stay on the convenience component, pass `renderNavigation`, `renderWeekdays`, or `renderDay` props to inject custom controls, or keep using the legacy `renderDayContent` helper. `PhotoCalendar` continues to provide the original all-in-one experience if you don’t need custom controls.
 
+Navigation can also be assembled from the exported buttons and layout helpers (`PhotoCalendarNavigationLayout`, `PhotoCalendarNavigationPrevMonthButton`, etc.), letting you mix stock behaviour with bespoke markup without threading handlers manually.
+
 ```tsx
 import { PhotoCalendar, PhotoCalendarDay } from '@tinybeans/photo-calendar';
 
@@ -88,7 +112,14 @@ import { PhotoCalendar, PhotoCalendarDay } from '@tinybeans/photo-calendar';
       day={{
         ...props,
         defaultContent: (
-          <div className={`my-day ${props.isToday ? 'my-day--today' : ''}`}>
+          <div
+            style={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              outline: props.isToday ? '2px solid #f97316' : 'none',
+              outlineOffset: props.isToday ? '2px' : undefined
+            }}
+          >
             {props.defaultContent}
           </div>
         )

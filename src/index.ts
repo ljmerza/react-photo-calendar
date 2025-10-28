@@ -35,3 +35,15 @@ export {
   PhotoCalendarDay,
   type PhotoCalendarDayProps
 } from './primitives/PhotoCalendarDay';
+export {
+  PhotoCalendarNavigationLayout,
+  PhotoCalendarNavigationYearHeading,
+  PhotoCalendarNavigationControls,
+  PhotoCalendarNavigationPrevYearButton,
+  PhotoCalendarNavigationNextYearButton,
+  PhotoCalendarNavigationPrevMonthButton,
+  PhotoCalendarNavigationNextMonthButton,
+  PhotoCalendarNavigationMonthChips,
+  PhotoCalendarNavigationMonthLabelMobile,
+  PhotoCalendarNavigationTodayButton
+} from './components/CalendarBanner';

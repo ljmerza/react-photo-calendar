@@ -22,6 +22,42 @@ The headless primitives expose render props so consumers can provide custom mark
 - Disabled state flags for prev/next month/year
 - `isMonthDisabled(monthIndex)` callback (useful for availability grids)
 
+Prefer composing navigation without render props? Import the headless pieces exported from `src/components/CalendarBanner.tsx`:
+
+```tsx
+import {
+  PhotoCalendarNavigationLayout,
+  PhotoCalendarNavigationYearHeading,
+  PhotoCalendarNavigationControls,
+  PhotoCalendarNavigationPrevYearButton,
+  PhotoCalendarNavigationPrevMonthButton,
+  PhotoCalendarNavigationMonthChips,
+  PhotoCalendarNavigationMonthLabelMobile,
+  PhotoCalendarNavigationNextYearButton,
+  PhotoCalendarNavigationNextMonthButton,
+  PhotoCalendarNavigationTodayButton
+} from '@tinybeans/photo-calendar';
+
+<PhotoCalendarNavigation>
+  {() => (
+    <PhotoCalendarNavigationLayout>
+      <PhotoCalendarNavigationYearHeading />
+      <PhotoCalendarNavigationControls>
+        <PhotoCalendarNavigationPrevYearButton />
+        <PhotoCalendarNavigationPrevMonthButton />
+        <PhotoCalendarNavigationMonthChips />
+        <PhotoCalendarNavigationMonthLabelMobile />
+        <PhotoCalendarNavigationNextYearButton />
+        <PhotoCalendarNavigationNextMonthButton />
+        <PhotoCalendarNavigationTodayButton />
+      </PhotoCalendarNavigationControls>
+    </PhotoCalendarNavigationLayout>
+  )}
+</PhotoCalendarNavigation>
+```
+
+Each component reads the necessary data from `usePhotoCalendarContext`, so you can mix and match them—or drop in your own markup alongside the primitives—to build bespoke navigation bars without prop-drilling.
+
 ## `<PhotoCalendarWeekdays>`
 
 ```tsx
@@ -69,7 +105,14 @@ import { PhotoCalendarDay } from '@tinybeans/photo-calendar';
       day={{
         ...props,
         defaultContent: (
-          <div className={`my-day ${props.isToday ? 'my-day--today' : ''}`}>
+          <div
+            style={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              outline: props.isToday ? '2px solid #f97316' : 'none',
+              outlineOffset: props.isToday ? '2px' : undefined
+            }}
+          >
             {props.defaultContent}
           </div>
         )

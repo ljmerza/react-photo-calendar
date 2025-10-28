@@ -42,17 +42,6 @@
   color: var(--calendar-color-text);
 }
 
-.today-button {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.875rem;
-  border-radius: var(--calendar-radius-button);
-  font-weight: 500;
-  transition: background 0.2s;
-  background: var(--calendar-color-surface-muted);
-  color: var(--calendar-color-text);
-}
-
-.today-button:disabled,
 .today-button-icon:disabled {
   opacity: 0.5;
   cursor: not-allowed;
