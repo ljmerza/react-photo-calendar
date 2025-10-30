@@ -112,6 +112,28 @@ export const HeadlessComposition = () => (
   </PhotoCalendarRoot>
 );
 
+export const MobileScrollNavigation = () => (
+  <div
+    style={{
+      maxWidth: 420,
+      height: 640,
+      margin: '0 auto',
+      borderRadius: 16,
+      border: '1px solid rgba(0,0,0,0.1)',
+      overflow: 'hidden',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+    }}
+  >
+    <PhotoCalendar
+      defaultMonthKey={currentMonthKey}
+      entries={sampleEntries}
+      navigationMode="scroll"
+      scrollMaxRenderedMonths={7}
+      style={{ height: '100%' }}
+    />
+  </div>
+);
+
 export const NavigationPrimitives = () => (
   <PhotoCalendarRoot entries={sampleEntries} defaultMonthKey={currentMonthKey}>
     {() => (

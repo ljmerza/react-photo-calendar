@@ -22,6 +22,7 @@ export interface UsePhotoCalendarStateOptions {
   minMonthKey?: string;
   maxMonthKey?: string;
   onRangeChange?: (range: VisibleRange) => void;
+  onVisibleMonthChange?: (monthKey: string) => void;
   locale?: string;
   timeZone?: string;
 }
@@ -36,6 +37,22 @@ export interface PhotoCalendarDayState {
   context: DayRenderContext;
   ariaLabel: string;
   isSelectable: boolean;
+}
+
+export interface PhotoCalendarMonthSnapshot {
+  monthKey: string;
+  monthDate: Date;
+  monthLabel: string;
+  visibleRange: VisibleRange | null;
+  dayStates: PhotoCalendarDayState[];
+}
+
+export interface PhotoCalendarScrollState {
+  getMonthSnapshot: (monthKey: string) => PhotoCalendarMonthSnapshot;
+  getAdjacentMonthKey: (currentMonthKey: string, delta: number) => string | null;
+  clampMonthKey: (monthKey: string) => string;
+  isMonthWithinBounds: (monthKey: string) => boolean;
+  syncVisibleMonth: (monthKey: string) => void;
 }
 
 export interface PhotoCalendarNavigationState {
@@ -62,6 +79,7 @@ export interface PhotoCalendarState {
   visibleRange: VisibleRange | null;
   dayStates: PhotoCalendarDayState[];
   navigation: PhotoCalendarNavigationState;
+  scroll: PhotoCalendarScrollState;
   isControlled: boolean;
 }
 
@@ -76,6 +94,7 @@ export function usePhotoCalendarState({
   minMonthKey,
   maxMonthKey,
   onRangeChange,
+  onVisibleMonthChange,
   locale,
   timeZone
 }: UsePhotoCalendarStateOptions = {}): PhotoCalendarState {
@@ -118,21 +137,7 @@ export function usePhotoCalendarState({
       ),
     [monthNameFormatter]
   );
-  const monthLabel = useMemo(() => monthLabelFormatter.format(monthDate), [monthLabelFormatter, monthDate]);
-  const calendarCells = useMemo(() => createCalendarCells(monthDate, firstDayOfWeek), [monthDate, firstDayOfWeek]);
   const photosByDate = useMemo(() => createPhotosByDateMap(entries), [entries]);
-  const visibleRange = useMemo(() => {
-    const range = getVisibleRange(calendarCells);
-    if (!range) {
-      return null;
-    }
-    return {
-      start: range.start,
-      end: range.end,
-      startIso: range.start.toISOString().slice(0, 10),
-      endIso: range.end.toISOString().slice(0, 10)
-    };
-  }, [calendarCells]);
   const weekdayLabels = useMemo(() => {
     const baseDates = Array.from({ length: 7 }, (_, index) => new Date(Date.UTC(2021, 7, index + 1)));
     const shortNames = baseDates.map((date) => weekdayShortFormatter.format(date));
@@ -143,8 +148,86 @@ export function usePhotoCalendarState({
       long: rotate(longNames)
     };
   }, [firstDayOfWeek, weekdayShortFormatter, weekdayLongFormatter]);
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const maxThumbnails = Math.max(1, maxThumbnailsPerDay);
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const handleDaySelect = useCallback(
+    (cell: CalendarCell) => {
+      onDaySelect?.({
+        isoDate: cell.isoDate,
+        date: cell.date
+      });
+    },
+    [onDaySelect]
+  );
+
+  const computeVisibleRange = useCallback((cells: CalendarCell[]): VisibleRange | null => {
+    const range = getVisibleRange(cells);
+    if (!range) {
+      return null;
+    }
+    return {
+      start: range.start,
+      end: range.end,
+      startIso: range.start.toISOString().slice(0, 10),
+      endIso: range.end.toISOString().slice(0, 10)
+    };
+  }, []);
+
+  const buildMonthSnapshot = useCallback(
+    (targetMonthDate: Date): PhotoCalendarMonthSnapshot => {
+      const cells = createCalendarCells(targetMonthDate, firstDayOfWeek);
+      const range = computeVisibleRange(cells);
+      const monthKeyValue = formatMonthKey(targetMonthDate);
+      const monthLabelValue = monthLabelFormatter.format(targetMonthDate);
+
+      const dayStatesForMonth = cells.map((cell) => {
+        const photos = photosByDate[cell.isoDate] ?? [];
+        const visibleThumbnails = photos.slice(0, maxThumbnails);
+        const overflow = Math.max(0, photos.length - visibleThumbnails.length);
+        const isToday = cell.isoDate === todayIso;
+        const isSelectable = cell.inCurrentMonth;
+
+        const context: DayRenderContext = {
+          date: cell.date,
+          isoDate: cell.isoDate,
+          day: cell.day,
+          isCurrentMonth: cell.inCurrentMonth,
+          isToday,
+          photos,
+          visibleThumbnails,
+          overflow,
+          selectDay: () => {
+            if (isSelectable) {
+              handleDaySelect(cell);
+            }
+          }
+        };
+
+        const totalPhotos = photos.length;
+        const photoPhrase = totalPhotos === 0 ? 'No photos' : `${totalPhotos} ${totalPhotos === 1 ? 'photo' : 'photos'}`;
+
+        return {
+          cell,
+          context,
+          ariaLabel: `${dayLabelFormatter.format(cell.date)}. ${photoPhrase}`,
+          isSelectable
+        };
+      });
+
+      return {
+        monthKey: monthKeyValue,
+        monthDate: new Date(targetMonthDate.getTime()),
+        monthLabel: monthLabelValue,
+        visibleRange: range,
+        dayStates: dayStatesForMonth
+      };
+    },
+    [computeVisibleRange, dayLabelFormatter, firstDayOfWeek, handleDaySelect, maxThumbnails, monthLabelFormatter, photosByDate, todayIso]
+  );
+
+  const currentSnapshot = useMemo(() => buildMonthSnapshot(monthDate), [buildMonthSnapshot, monthDate]);
+  const { monthLabel, visibleRange, dayStates } = currentSnapshot;
 
   useEffect(() => {
     if (!onRangeChange || !visibleRange) {
@@ -153,6 +236,13 @@ export function usePhotoCalendarState({
 
     onRangeChange(visibleRange);
   }, [onRangeChange, visibleRange]);
+
+  useEffect(() => {
+    if (!onVisibleMonthChange) {
+      return;
+    }
+    onVisibleMonthChange(effectiveMonthKey);
+  }, [effectiveMonthKey, onVisibleMonthChange]);
 
   const toComparableMonth = useCallback((date: Date) => date.getUTCFullYear() * 12 + date.getUTCMonth(), []);
 
@@ -251,6 +341,53 @@ export function usePhotoCalendarState({
     commitMonthChange(clamped);
   }, [clampToRange, commitMonthChange, currentMonthIndex, toComparableMonth]);
 
+  const clampMonthKey = useCallback(
+    (candidateKey: string) => formatMonthKey(clampToRange(parseMonthKey(candidateKey))),
+    [clampToRange]
+  );
+
+  const getMonthSnapshot = useCallback(
+    (monthKeyValue: string) => {
+      const targetDate = parseMonthKey(monthKeyValue);
+      const clampedDate = clampToRange(targetDate);
+      return buildMonthSnapshot(clampedDate);
+    },
+    [buildMonthSnapshot, clampToRange]
+  );
+
+  const getAdjacentMonthKey = useCallback(
+    (currentMonthKeyValue: string, delta: number) => {
+      if (delta === 0) {
+        return clampMonthKey(currentMonthKeyValue);
+      }
+      const currentDate = parseMonthKey(currentMonthKeyValue);
+      const candidateDate = addMonths(currentDate, delta);
+      if (!isWithinRange(candidateDate)) {
+        const clamped = clampToRange(candidateDate);
+        if (toComparableMonth(clamped) === toComparableMonth(currentDate)) {
+          return null;
+        }
+        return formatMonthKey(clamped);
+      }
+      return formatMonthKey(candidateDate);
+    },
+    [clampMonthKey, clampToRange, isWithinRange, toComparableMonth]
+  );
+
+  const isMonthWithinBounds = useCallback(
+    (candidateKey: string) => isWithinRange(parseMonthKey(candidateKey)),
+    [isWithinRange]
+  );
+
+  const syncVisibleMonth = useCallback(
+    (monthKeyValue: string) => {
+      const nextDate = parseMonthKey(monthKeyValue);
+      const clamped = clampToRange(nextDate);
+      commitMonthChange(clamped);
+    },
+    [clampToRange, commitMonthChange]
+  );
+
   const isMonthDisabled = useCallback(
     (monthIndex: number) => {
       const candidate = new Date(Date.UTC(currentYear, monthIndex, 1));
@@ -276,55 +413,6 @@ export function usePhotoCalendarState({
   );
   const canNavigatePrevYear = canNavigatePrevMonth;
   const canNavigateNextYear = canNavigateNextMonth;
-
-  const handleDaySelect = useCallback(
-    (cell: CalendarCell) => {
-      onDaySelect?.({
-        isoDate: cell.isoDate,
-        date: cell.date
-      });
-    },
-    [onDaySelect]
-  );
-
-  const dayStates = useMemo<PhotoCalendarDayState[]>(() => {
-    const formatAriaLabel = (cell: CalendarCell, totalPhotos: number) => {
-      const photoPhrase =
-        totalPhotos === 0 ? 'No photos' : `${totalPhotos} ${totalPhotos === 1 ? 'photo' : 'photos'}`;
-      return `${dayLabelFormatter.format(cell.date)}. ${photoPhrase}`;
-    };
-
-    return calendarCells.map((cell) => {
-      const photos = photosByDate[cell.isoDate] ?? [];
-      const visibleThumbnails = photos.slice(0, maxThumbnails);
-      const overflow = Math.max(0, photos.length - visibleThumbnails.length);
-      const isToday = cell.isoDate === todayIso;
-      const isSelectable = cell.inCurrentMonth;
-
-      const context: DayRenderContext = {
-        date: cell.date,
-        isoDate: cell.isoDate,
-        day: cell.day,
-        isCurrentMonth: cell.inCurrentMonth,
-        isToday,
-        photos,
-        visibleThumbnails,
-        overflow,
-        selectDay: () => {
-          if (isSelectable) {
-            handleDaySelect(cell);
-          }
-        }
-      };
-
-      return {
-        cell,
-        context,
-        ariaLabel: formatAriaLabel(cell, photos.length),
-        isSelectable
-      };
-    });
-  }, [calendarCells, dayLabelFormatter, handleDaySelect, maxThumbnails, photosByDate, todayIso]);
 
   const navigation: PhotoCalendarNavigationState = useMemo(
     () => ({
@@ -353,6 +441,17 @@ export function usePhotoCalendarState({
     ]
   );
 
+  const scroll: PhotoCalendarScrollState = useMemo(
+    () => ({
+      getMonthSnapshot,
+      getAdjacentMonthKey,
+      clampMonthKey,
+      isMonthWithinBounds,
+      syncVisibleMonth
+    }),
+    [clampMonthKey, getAdjacentMonthKey, getMonthSnapshot, isMonthWithinBounds, syncVisibleMonth]
+  );
+
   return {
     currentYear,
     currentMonth,
@@ -364,6 +463,7 @@ export function usePhotoCalendarState({
     visibleRange,
     dayStates,
     navigation,
+    scroll,
     isControlled
   };
 }

@@ -5,6 +5,7 @@ import { PhotoCalendarNavigation, type NavigationRenderProps } from './primitive
 import { PhotoCalendarWeekdays, type WeekdayRenderProps } from './primitives/PhotoCalendarWeekdays';
 import { PhotoCalendarMonthGrid, type DayRenderProps } from './primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarDay } from './primitives/PhotoCalendarDay';
+import { PhotoCalendarScrollView } from './components/PhotoCalendarScrollView';
 import type { DayRenderContext, VisibleRange } from './types/calendar';
 import type { PhotoEntry } from './types/photo';
 
@@ -54,6 +55,10 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    */
   onRangeChange?: (range: VisibleRange) => void;
   /**
+   * Fired when the scroll timeline promotes a new month into the active position.
+   */
+  onVisibleMonthChange?: (monthKey: string) => void;
+  /**
    * Locale override used for weekday/month labels. Defaults to browser locale.
    */
   locale?: string;
@@ -81,6 +86,15 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    * Optional slot for dev-only scaffolding while the headless primitives are built.
    */
   children?: ReactNode;
+  /**
+   * Switch between legacy control navigation and the mobile scroll timeline.
+   * Defaults to "controls" for backward compatibility.
+   */
+  navigationMode?: 'controls' | 'scroll';
+  /**
+   * Maximum number of months to keep mounted when `navigationMode` is "scroll".
+   */
+  scrollMaxRenderedMonths?: number;
 }
 
 export function PhotoCalendar({
@@ -94,6 +108,7 @@ export function PhotoCalendar({
   minMonthKey,
   maxMonthKey,
   onRangeChange,
+  onVisibleMonthChange,
   locale,
   timeZone,
   renderDayContent,
@@ -101,6 +116,8 @@ export function PhotoCalendar({
   renderNavigation,
   renderWeekdays,
   children,
+  navigationMode = 'controls',
+  scrollMaxRenderedMonths,
   ...rest
 }: PhotoCalendarProps) {
   const calendarOptions = {
@@ -114,6 +131,7 @@ export function PhotoCalendar({
     minMonthKey,
     maxMonthKey,
     onRangeChange,
+    onVisibleMonthChange,
     locale,
     timeZone
   };
@@ -125,11 +143,28 @@ export function PhotoCalendar({
         )
       : undefined;
   const resolvedNavigation = renderNavigation
-    ? (props: NavigationRenderProps) => renderNavigation(props)
+      ? (props: NavigationRenderProps) => renderNavigation(props)
     : undefined;
   const resolvedWeekdays = renderWeekdays
     ? (props: WeekdayRenderProps) => renderWeekdays(props)
     : undefined;
+
+  if (navigationMode === 'scroll') {
+    return (
+      <PhotoCalendarRoot {...calendarOptions}>
+        {() => (
+          <PhotoCalendarScrollView
+            {...rest}
+            renderDay={resolvedRenderDay}
+            renderWeekdays={resolvedWeekdays}
+            maxRenderedMonths={scrollMaxRenderedMonths}
+          >
+            {children}
+          </PhotoCalendarScrollView>
+        )}
+      </PhotoCalendarRoot>
+    );
+  }
 
   return (
     <PhotoCalendarRoot {...calendarOptions}>

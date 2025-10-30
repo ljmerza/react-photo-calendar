@@ -4,6 +4,8 @@ export {
   type PhotoCalendarState,
   type PhotoCalendarDayState,
   type PhotoCalendarNavigationState,
+  type PhotoCalendarMonthSnapshot,
+  type PhotoCalendarScrollState,
   type UsePhotoCalendarStateOptions,
   type WeekdayLabels
 } from './hooks/usePhotoCalendarState';
@@ -47,3 +49,7 @@ export {
   PhotoCalendarNavigationMonthLabelMobile,
   PhotoCalendarNavigationTodayButton
 } from './components/CalendarBanner';
+export {
+  PhotoCalendarScrollView,
+  type PhotoCalendarScrollViewProps
+} from './components/PhotoCalendarScrollView';

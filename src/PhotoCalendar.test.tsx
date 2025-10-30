@@ -161,4 +161,26 @@ describe('PhotoCalendar', () => {
     expect(renderSpy).toHaveBeenCalledWith('2030-01-01', 1, true);
     expect(renderSpy).toHaveBeenCalledWith('2030-01-02', 1, true);
   });
+
+  it('renders scroll navigation timeline with adjacent months', () => {
+    render(<PhotoCalendar defaultMonthKey="2030-01" navigationMode="scroll" />);
+
+    const timeline = screen.getByRole('grid', { name: /photo calendar timeline/i });
+    expect(timeline).toBeTruthy();
+
+    expect(() => screen.getByText('January 2030')).not.toThrow();
+    expect(() => screen.getByText('December 2029')).not.toThrow();
+    expect(() => screen.getByText('February 2030')).not.toThrow();
+  });
+
+  it('syncs scroll navigation aria label in controlled mode', () => {
+    const { rerender } = render(<PhotoCalendar monthKey="2030-01" navigationMode="scroll" />);
+
+    const initialTimeline = screen.getByRole('grid', { name: /photo calendar timeline/i });
+    expect(initialTimeline.getAttribute('aria-label')).toContain('January 2030');
+
+    rerender(<PhotoCalendar monthKey="2030-03" navigationMode="scroll" />);
+    const updatedTimeline = screen.getByRole('grid', { name: /photo calendar timeline/i });
+    expect(updatedTimeline.getAttribute('aria-label')).toContain('March 2030');
+  });
 });
