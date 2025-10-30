@@ -35,11 +35,12 @@
    - Maintain an ordered list of month descriptors (`{ year, monthNumber, key }`) derived from `usePhotoCalendarState`.
    - Use sentinels (e.g., `IntersectionObserver`) near the top/bottom to trigger addition of previous/next month descriptors.
    - Recycle months by keeping a window (e.g., ±6 months around the visible index); remove DOM nodes outside the window while retaining cached data in state.
+   - Derive the active month from scroll position so the sticky header updates immediately when users reverse direction.
    - Consider leveraging an existing hook (`useVirtualizer` from TanStack Virtual) if bundle impact is acceptable; otherwise implement a lightweight index-based virtualizer tailored to the calendar.
 3. **State integration**
    - Extend `usePhotoCalendarState` to expose utilities for month list navigation (`getAdjacentMonth`, `clampToBounds`) and an event for `onVisibleMonthChange`.
    - Keep `currentMonth`/`currentYear` as the authoritative state; scrolling updates these values when the leading month changes, allowing existing day grid logic to remain intact.
-   - Provide imperative handle (ref) on `PhotoCalendarScrollView` with `scrollToMonth({ year, month })` to support `goToToday` and external integrations.
+   - Expose a `scroll` helper object (snapshots, month adjacency, bounds checks, state sync) through context so advanced consumers can coordinate prefetching and analytics without imperative refs.
 4. **Data hydration**
    - Prefetch photo data for months within the render window by reusing existing data loaders, ensuring requests remain cancellable when months exit the window.
    - Expose hooks/callbacks (`onMonthRangeVisible`) so consumers can eagerly fetch assets beyond the immediate window if desired.

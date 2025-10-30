@@ -10,6 +10,7 @@
 - Consumers can override navigation, weekday headers, and day rendering via render props (`renderNavigation`, `renderWeekdays`, `renderDay`) or build entirely custom shells with the primitives and context hook.
 - Design tokens exposed through CSS variables allow theming without touching JSX.
 - Optional helper components such as `PhotoCalendarDay` expose the default button markup for consumers who want partial overrides without rebuilding accessibility wiring.
+- A mobile scroll timeline ships behind `navigationMode="scroll"` with `onVisibleMonthChange` and a `scroll` helper state so consumers can prefetch adjacent months while keeping the legacy banner as a fallback.
 
 ## Guiding Principles
 - **Headless-first**: expose state and callbacks via hooks/context so UI can be composed anywhere in the tree.

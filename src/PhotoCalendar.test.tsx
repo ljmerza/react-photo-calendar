@@ -183,4 +183,70 @@ describe('PhotoCalendar', () => {
     const updatedTimeline = screen.getByRole('grid', { name: /photo calendar timeline/i });
     expect(updatedTimeline.getAttribute('aria-label')).toContain('March 2030');
   });
+
+  it('renders custom day elements via renderDay', () => {
+    const renderDay = vi.fn((props: any) => (
+      <button
+        type="button"
+        role="gridcell"
+        aria-label={`custom ${props.isoDate}`}
+        data-testid={`day-${props.isoDate}`}
+      >
+        {props.defaultContent}
+      </button>
+    ));
+
+    render(<PhotoCalendar monthKey="2030-01" renderDay={renderDay} />);
+
+    expect(renderDay).toHaveBeenCalled();
+    const dayCell = screen.getByTestId('day-2030-01-01');
+    expect(dayCell.getAttribute('aria-label')).toBe('custom 2030-01-01');
+    expect(() => within(dayCell).getByText('1')).not.toThrow();
+  });
+
+  it('provides navigation state to renderNavigation override', () => {
+    const monthChange = vi.fn();
+    const navigationSpy = vi.fn(({ monthLabel, navigateMonth }) => (
+      <button type="button" onClick={() => navigateMonth(1)}>
+        custom navigation for {monthLabel}
+      </button>
+    ));
+
+    render(<PhotoCalendar monthKey="2030-01" onMonthChange={monthChange} renderNavigation={navigationSpy} />);
+
+    expect(navigationSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentYear: 2030,
+        currentMonth: 0,
+        monthLabel: expect.stringContaining('January 2030'),
+        navigateMonth: expect.any(Function)
+      })
+    );
+
+    const customButton = screen.getByRole('button', { name: /custom navigation for/i });
+    fireEvent.click(customButton);
+    expect(monthChange).toHaveBeenCalledWith('2030-02');
+  });
+
+  it('passes weekday labels to renderWeekdays override', () => {
+    const weekdaySpy = vi.fn(({ shortLabels, longLabels }: any) => (
+      <div role="row">
+        {shortLabels.map((label: string, index: number) => (
+          <span key={label} role="columnheader">
+            {label} ({longLabels[index]})
+          </span>
+        ))}
+      </div>
+    ));
+
+    render(<PhotoCalendar monthKey="2030-01" renderWeekdays={weekdaySpy} />);
+
+    expect(weekdaySpy).toHaveBeenCalled();
+    const args = weekdaySpy.mock.calls[0][0];
+    expect(args.shortLabels).toHaveLength(7);
+    expect(args.longLabels).toHaveLength(7);
+    args.shortLabels.forEach((label: string) => expect(label.length).toBeGreaterThan(0));
+    args.longLabels.forEach((label: string) => expect(label.length).toBeGreaterThan(0));
+    expect(screen.getAllByRole('columnheader')[0].textContent).toMatch(/\(/);
+  });
 });

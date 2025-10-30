@@ -21,7 +21,8 @@ contract outlined in ADR-009.
 ## Project layout
 
 - `src/index.ts` – public exports for the library package.
-- `src/PhotoCalendar.tsx` – convenience component that composes the headless primitives with the reference UI.
+- `src/PhotoCalendar.tsx` – convenience component that composes the headless primitives with the reference UI (including the optional scroll timeline).
+- `src/components/PhotoCalendarScrollView.tsx` – mobile-first scroll navigation shell consumed when `navigationMode="scroll"`.
 - `src/primitives/` – `PhotoCalendarRoot`, `PhotoCalendarNavigation`, `PhotoCalendarWeekdays`, `PhotoCalendarMonthGrid`, and `PhotoCalendarDay` headless building blocks.
 - `src/hooks/usePhotoCalendarState.ts` – shared state hook consumed by both the convenience component and primitives.
 - `.storybook/` – Storybook configuration powered by the React + Vite framework preset.
@@ -134,3 +135,65 @@ Use `monthKey` + `onMonthChange` to control the visible month externally, or pre
 `renderDayContent` receives the same `DayRenderContext` as before plus a `defaultContent` field—return it when you want to append to the stock thumbnails/day number layout instead of replacing it outright. Theme variables are documented in `docs/photo-calendar-design-tokens.md` so you can override colours/radii without touching JSX.
 
 Once the component architecture stabilizes, this folder can be promoted into a stand-alone repository without significant changes—package metadata already assumes an eventual npm distribution.
+
+## Mobile scroll timeline
+
+Set `navigationMode="scroll"` on `PhotoCalendar` (or mount `PhotoCalendarScrollView` yourself) to swap the legacy button banner for the vertically scrolling timeline. The scroll shell keeps a small window of months mounted, sticks each month header to the top edge, and emits `onVisibleMonthChange` whenever the leading month shifts—ideal for lazy-loading more photo data as users skim the timeline.
+
+```tsx
+const loadMonth = (monthKey: string) => {
+  // trigger fetch logic here
+};
+
+export function MobileTimeline() {
+  const pending = useRef(new Set<string>());
+
+  const prefetchCluster = useCallback((key: string) => {
+    if (pending.current.has(key)) return;
+    pending.current.add(key);
+    loadMonth(key).finally(() => pending.current.delete(key));
+  }, []);
+
+  return (
+    <PhotoCalendar
+      navigationMode="scroll"
+      onVisibleMonthChange={(key) => {
+        prefetchCluster(key);
+        // grab adjacent months via scroll state helpers if needed
+      }}
+      scrollMaxRenderedMonths={7}
+    />
+  );
+}
+
+// Access scroll helpers via the context when you need neighbouring keys
+export function PrefetchingTimeline() {
+  // assumes PhotoCalendarScrollView + PhotoCalendarScrollState are imported
+  const scrollRef = useRef<PhotoCalendarScrollState | null>(null);
+
+  return (
+    <PhotoCalendarRoot
+      onVisibleMonthChange={(key) => {
+        const scroll = scrollRef.current;
+        if (!scroll) {
+          return;
+        }
+        const neighbours = [
+          scroll.getAdjacentMonthKey(key, -1),
+          key,
+          scroll.getAdjacentMonthKey(key, 1)
+        ].filter(Boolean) as string[];
+
+        neighbours.forEach(loadMonth);
+      }}
+    >
+      {(state) => {
+        scrollRef.current = state.scroll;
+        return <PhotoCalendarScrollView />;
+      }}
+    </PhotoCalendarRoot>
+  );
+}
+```
+
+Advanced consumers can access the scroll helpers (`getMonthSnapshot`, `getAdjacentMonthKey`, `syncVisibleMonth`) exposed on `state.scroll` by rendering through `PhotoCalendarRoot`. The helpers make it easy to prefetch neighbouring months, jump to specific anchors, or compute analytics without coupling to component internals.

@@ -11,10 +11,11 @@ Storybook packages are listed as dev dependencies; run `npm install` to pull the
 ## Structure
 - `.storybook/main.js` – Storybook configuration (React + Vite framework preset, essentials addon).
 - `.storybook/preview.js` – global parameters and shared styles (imports `src/PhotoCalendar.css`).
-- `src/stories/PhotoCalendar.stories.tsx` – canonical stories covering the default component, render-prop overrides, and headless composition.
+- `src/stories/PhotoCalendar.stories.tsx` – canonical stories covering the default component, render-prop overrides, headless composition, and the new mobile scroll timeline.
 
 Add additional stories in `src/stories/` (they are excluded from the library build via `tsconfig.build.json`).
 
 ## Notes
 - Stories seed a large spread of picsum photos (roughly half the days in the current month plus half in the previous month) so navigation showcases real data. Swap them for local assets if offline previews are required.
 - `PhotoCalendarDay` is exported for consumers that want to extend the default button markup without reimplementing accessibility semantics—use it inside stories to keep the grid functional while styling.
+- `MobileScrollNavigation` wraps the scroll timeline in a phone-sized viewport; reference it when validating sticky header styling or testing `onVisibleMonthChange` integrations.

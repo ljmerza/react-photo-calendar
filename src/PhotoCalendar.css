@@ -282,6 +282,17 @@
   color: #fff;
 }
 
+@media (max-width: 600px) {
+  .cell-label {
+    /* Reduce badge footprint for tighter mobile layouts */
+    top: 0.25rem;
+    right: 0.25rem;
+    padding: 0.1rem 0.225rem;
+    border-radius: 2px;
+    font-size: 0.5rem;
+  }
+}
+
 .calendar-cell-thumbnails {
   position: absolute;
   inset: 0;

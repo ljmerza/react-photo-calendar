@@ -8,3 +8,5 @@ dist
 .idea
 .DS_Store
 coverage
+
+console.log

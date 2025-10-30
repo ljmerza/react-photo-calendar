@@ -124,6 +124,55 @@ import { PhotoCalendarDay } from '@tinybeans/photo-calendar';
 
 `props.defaultContent` already contains the stock layout; replace or wrap it to keep the existing button/focus behaviour without cloning the thumbnail logic yourself.
 
+`PhotoCalendarMonthGrid` also accepts an optional `dayStates` array. Supplying this lets you render multiple months in one container with precomputed data (the scroll timeline uses the escape hatch to mount past/future months without interfering with the primary context value).
+
+## `<PhotoCalendarScrollView>`
+
+The mobile scroll navigation shell is exported as `PhotoCalendarScrollView`. It consumes the same context as the other primitives and accepts the familiar `renderDay` / `renderWeekdays` overrides plus a `maxRenderedMonths` window size. Mount it inside a `PhotoCalendarRoot` when you want full control over the surrounding layout or the scroll window size.
+
+```tsx
+import {
+  PhotoCalendarRoot,
+  PhotoCalendarScrollView
+} from '@tinybeans/photo-calendar';
+
+<PhotoCalendarRoot onVisibleMonthChange={console.log}>
+  {(state) => (
+    <PhotoCalendarScrollView
+      renderDay={customDayRenderer}
+      maxRenderedMonths={5}
+      style={{ height: '100%' }}
+    />
+  )}
+</PhotoCalendarRoot>;
+```
+
+`PhotoCalendarState` now exposes a `scroll` property with helpers:
+
+- `getMonthSnapshot(monthKey)` – returns cached day state, labels, and visible range for any month.
+- `getAdjacentMonthKey(currentKey, delta)` – returns the next/previous month respecting min/max bounds.
+- `clampMonthKey(monthKey)` – clamps arbitrary ISO yyyy-mm strings into the allowed window.
+- `isMonthWithinBounds(monthKey)` – boolean guard for month availability.
+- `syncVisibleMonth(monthKey)` – pushes a month into the “current” slot (used by the scroll timeline to keep controlled consumers in sync).
+
+Listen for the new `onVisibleMonthChange` callback to prefetch data whenever the sticky header changes:
+
+```tsx
+const pending = new Set<string>();
+
+<PhotoCalendar
+  navigationMode="scroll"
+  onVisibleMonthChange={(monthKey) => {
+    if (!pending.has(monthKey)) {
+      pending.add(monthKey);
+      fetchMonthPhotos(monthKey).finally(() => pending.delete(monthKey));
+    }
+  }}
+/>;
+```
+
+When you need more context inside the callback (e.g., to prefetch adjacent months), pair it with `PhotoCalendarRoot` and store the latest `state.scroll` reference as shown in the README.
+
 ## `<PhotoCalendarRoot>`
 
 `PhotoCalendarRoot` accepts the same props as `<PhotoCalendar>` (month control, locale, entries, etc.). Its children can be either nodes or a render function receiving the entire `PhotoCalendarState`. The render function form is ideal for composing custom wrappers:

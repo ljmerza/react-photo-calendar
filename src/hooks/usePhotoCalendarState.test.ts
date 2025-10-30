@@ -75,4 +75,22 @@ describe('usePhotoCalendarState', () => {
     expect(target!.context.visibleThumbnails).toHaveLength(1);
     expect(target!.context.overflow).toBe(1);
   });
+
+  it('invokes onVisibleMonthChange when the effective month updates', async () => {
+    const spy = vi.fn();
+    const { result } = renderHook(() =>
+      usePhotoCalendarState({
+        defaultMonthKey: '2030-01',
+        onVisibleMonthChange: spy
+      })
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('2030-01'));
+
+    act(() => {
+      result.current.navigation.navigateMonth(1);
+    });
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('2030-02'));
+  });
 });
