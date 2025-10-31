@@ -47,6 +47,10 @@
   background: var(--calendar-color-surface);
   /* Soft snapping so months settle near center */
   scroll-snap-type: y proximity;
+  /* Improve scroll performance and isolation */
+  contain: layout paint size;
+  /* Avoid browser auto-anchoring fighting our compensation logic */
+  overflow-anchor: none;
 }
 
 .calendar-scroll-sentinel {

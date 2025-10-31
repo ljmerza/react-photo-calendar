@@ -5,6 +5,7 @@ import { PhotoCalendarMonthGrid } from '../primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarWeekdays, type WeekdayRenderProps } from '../primitives/PhotoCalendarWeekdays';
 import type { DayRenderProps } from '../types/calendar';
 import { useCalendarMonthVisibility } from '../hooks/useCalendarMonthVisibility';
+import { useVirtualMonthList } from '../hooks/useVirtualMonthList';
 
 export interface PhotoCalendarScrollViewProps extends HTMLAttributes<HTMLDivElement> {
   /**
@@ -24,6 +25,12 @@ export interface PhotoCalendarScrollViewProps extends HTMLAttributes<HTMLDivElem
    * Defaults to 7 which keeps memory in check while preserving scroll continuity.
    */
   maxRenderedMonths?: number;
+  estimatedMonthHeight?: number;
+  overscanPx?: number;
+  activationHysteresisPx?: number;
+  armThresholdPx?: number;
+  triggerThresholdPx?: number;
+  prependBatchCount?: number;
 }
 
 const DEFAULT_MAX_RENDERED_MONTHS = 7;
@@ -37,6 +44,12 @@ export function PhotoCalendarScrollView({
   renderWeekdays,
   children,
   maxRenderedMonths = DEFAULT_MAX_RENDERED_MONTHS,
+  estimatedMonthHeight = 560,
+  overscanPx = 200,
+  activationHysteresisPx,
+  armThresholdPx = 160,
+  triggerThresholdPx = 32,
+  prependBatchCount = 6,
   className,
   ...rest
 }: PhotoCalendarScrollViewProps) {
@@ -124,9 +137,35 @@ export function PhotoCalendarScrollView({
   const ensureMonthInWindow = useCallback(
     (targetKey: string) => {
       const clamped = clampToToday(targetKey);
-      setMonthKeys((prev) => (prev.includes(clamped) ? prev : buildWindow(clamped, maxMountedMonths)));
+      setMonthKeys((prev) => {
+        if (prev.length === 0) return [clamped];
+        if (prev.includes(clamped)) return prev;
+        const first = prev[0];
+        const last = prev[prev.length - 1];
+        const next: string[] = [...prev];
+        if (toIndex(clamped) < toIndex(first)) {
+          // Fill backwards until clamped is included
+          let pivot = first;
+          while (toIndex(clamped) < toIndex(pivot)) {
+            const prevKey = scroll.getAdjacentMonthKey(pivot, -1);
+            if (!prevKey) break;
+            next.unshift(prevKey);
+            pivot = prevKey;
+          }
+          return next;
+        }
+        // Fill forwards until clamped is included (never past today)
+        let pivot = last;
+        while (toIndex(clamped) > toIndex(pivot)) {
+          const nxt = scroll.getAdjacentMonthKey(pivot, 1);
+          if (!nxt || !isNotInFuture(nxt)) break;
+          next.push(nxt);
+          pivot = nxt;
+        }
+        return next;
+      });
     },
-    [buildWindow, maxMountedMonths]
+    [clampToToday, isNotInFuture, scroll]
   );
 
   const [activeMonthKey, setActiveMonthKey] = useState<string>(monthKey);
@@ -138,21 +177,42 @@ export function PhotoCalendarScrollView({
   const sectionHeightsRef = useRef<Map<string, number>>(new Map());
   const extendBusyRef = useRef(false);
   const lastExtendAtRef = useRef(0);
+  const topExtendArmedRef = useRef(false);
+
+  const virtual = useVirtualMonthList({
+    containerRef,
+    monthKeys,
+    heights: sectionHeightsRef.current,
+    estimatedItemHeight: estimatedMonthHeight,
+    overscanPx,
+  });
+  const { startIndex, endIndex, topSpacerHeight, bottomSpacerHeight, sizes: virtualSizes, prefix: virtualPrefix } = virtual;
+  const renderKeys = monthKeys.slice(startIndex, endIndex + 1);
 
   const scrollToMonthKey = useCallback((targetKey: string, behavior: ScrollBehavior = 'smooth') => {
-    const node = monthRefs.current.get(targetKey);
     const container = containerRef.current;
-    if (!node || !container) return;
-    const targetTop = node.offsetTop - container.offsetTop;
-    const targetCenter = targetTop + node.offsetHeight / 2;
-    const containerCenter = container.clientHeight / 2;
-    const desiredScrollTop = Math.max(0, targetCenter - containerCenter);
+    if (!container) return;
+    const node = monthRefs.current.get(targetKey);
+    let desiredScrollTop: number | null = null;
+    if (node) {
+      const targetTop = node.offsetTop - container.offsetTop + topSpacerHeight;
+      const targetCenter = targetTop + node.offsetHeight / 2;
+      desiredScrollTop = Math.max(0, targetCenter - container.clientHeight / 2);
+    } else {
+      const index = monthKeys.indexOf(targetKey);
+      if (index >= 0) {
+        const itemTop = virtualPrefix[index] ?? 0;
+        const itemHeight = virtualSizes[index] ?? estimatedMonthHeight;
+        desiredScrollTop = Math.max(0, itemTop + itemHeight / 2 - container.clientHeight / 2);
+      }
+    }
+    if (desiredScrollTop === null) return;
     if (behavior === 'smooth') {
       container.scrollTo({ top: desiredScrollTop, behavior: 'smooth' });
     } else {
       container.scrollTop = desiredScrollTop;
     }
-  }, []);
+  }, [estimatedMonthHeight, monthKeys, topSpacerHeight, virtualPrefix, virtualSizes]);
 
   // Initial alignment
   useEffect(() => {
@@ -194,11 +254,11 @@ export function PhotoCalendarScrollView({
     });
   }, [ensureMonthInWindow, monthKey, scrollToMonthKey]);
 
-  // Only render the heavy month grid when the section is actually visible
+  // Only render the heavy month grid when the section is actually visible within the virtual range
   const visibleSet = useCalendarMonthVisibility({
     containerRef,
     monthRefs,
-    monthKeys,
+    monthKeys: renderKeys,
     threshold: 0.01,
   });
 
@@ -214,88 +274,69 @@ export function PhotoCalendarScrollView({
     });
   }, [visibleSet, monthRefs]);
 
-  // Extend window with scroll position compensation when prepending months
-  const extendWindowWithCompensation = useCallback((direction: 'prev' | 'next') => {
+  // Add earlier months above the current first key and compensate scrollTop to preserve viewport
+  const prependEarlierMonths = useCallback((count: number) => {
+    const root = containerRef.current;
+    if (!root || extendBusyRef.current) return;
     const nowTs = performance.now?.() ?? Date.now();
-    if (extendBusyRef.current && nowTs - lastExtendAtRef.current < 120) return;
+    if (nowTs - lastExtendAtRef.current < 150) return;
     extendBusyRef.current = true;
     lastExtendAtRef.current = nowTs;
 
-    const root = containerRef.current;
-    if (!root) {
-      extendWindow(direction);
-      extendBusyRef.current = false;
-      return;
-    }
-    if (direction === 'prev') {
-      const prevHeight = root.scrollHeight;
-      const prevTop = root.scrollTop;
-      extendWindow('prev');
-      requestAnimationFrame(() => {
-        const delta = root.scrollHeight - prevHeight;
-        if (delta > 0) {
-          root.scrollTop = prevTop + delta;
-        }
-        // release on next frame to avoid rapid re-entry
-        requestAnimationFrame(() => {
-          extendBusyRef.current = false;
-        });
-      });
-    } else {
-      extendWindow('next');
-      requestAnimationFrame(() => {
+    setMonthKeys((prev) => {
+      if (prev.length === 0) return prev;
+      let pivot = prev[0];
+      const newKeys: string[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const prevKey = scroll.getAdjacentMonthKey(pivot, -1);
+        if (!prevKey) break;
+        newKeys.unshift(prevKey);
+        pivot = prevKey;
+      }
+      if (newKeys.length === 0) {
         extendBusyRef.current = false;
+        return prev;
+      }
+      const added = newKeys.reduce((sum, k) => sum + (sectionHeightsRef.current.get(k) ?? estimatedMonthHeight), 0);
+      requestAnimationFrame(() => {
+        root.scrollTop += added;
+        extendBusyRef.current = false;
+        topExtendArmedRef.current = false;
       });
-    }
-  }, [extendWindow]);
+      return [...newKeys, ...prev];
+    });
+  }, [estimatedMonthHeight, scroll]);
 
-  // Window expansion via IntersectionObserver (bottom only)
+  // Append next months (up to today) when reaching the end of loaded keys
   useEffect(() => {
-    const root = containerRef.current;
-    const top = topSentinelRef.current;
-    const bottom = bottomSentinelRef.current;
-    if (!root || !top || !bottom || typeof IntersectionObserver === 'undefined') return;
-    let rafId: number | null = null;
-    let observer: IntersectionObserver | null = null;
-    let bottomWasIntersecting = false;
-    const start = () => {
-      observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.target === bottom) {
-              if (entry.isIntersecting && !bottomWasIntersecting) {
-                bottomWasIntersecting = true;
-                extendWindowWithCompensation('next');
-              } else if (!entry.isIntersecting && bottomWasIntersecting) {
-                bottomWasIntersecting = false;
-              }
-            }
-          });
-        },
-        { root, threshold: 0 }
-      );
-      observer.observe(bottom);
-    };
-    rafId = requestAnimationFrame(start);
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      observer?.disconnect();
-    };
-  }, [extendWindowWithCompensation]);
+    const lastIndex = monthKeys.length - 1;
+    const nearingEnd = endIndex >= lastIndex - 1;
+    if (!nearingEnd) return;
+    const lastKey = monthKeys[monthKeys.length - 1];
+    const nxt = scroll.getAdjacentMonthKey(lastKey, 1);
+    if (!nxt || !isNotInFuture(nxt)) return;
+    setMonthKeys((prev) => (prev.includes(nxt) ? prev : [...prev, nxt]));
+  }, [endIndex, isNotInFuture, monthKeys, scroll]);
 
   // Active month tracking on scroll (center-based)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const HYSTERESIS_PX = Math.max(24, Math.floor(container.clientHeight * 0.1));
+    const HYSTERESIS_PX = activationHysteresisPx ?? Math.max(24, Math.floor(container.clientHeight * 0.1));
+    const ARM_THRESHOLD = armThresholdPx; // user must scroll this far from top to arm another prepend
+    const TRIGGER_THRESHOLD = triggerThresholdPx; // near-top threshold to trigger a prepend when armed
     const onScroll = () => {
       if (isProgrammaticScrollRef.current) return;
       if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
       scrollFrameRef.current = requestAnimationFrame(() => {
         scrollFrameRef.current = null;
-        // Near-top check: extend previous month(s) when user approaches the top
-        if (container.scrollTop <= 48) {
-          extendWindowWithCompensation('prev');
+        // Arm when sufficiently away from top; disarm on prepend
+        if (container.scrollTop > ARM_THRESHOLD) {
+          topExtendArmedRef.current = true;
+        }
+        // Trigger once per approach when near the top
+        if (container.scrollTop <= TRIGGER_THRESHOLD && topExtendArmedRef.current) {
+          prependEarlierMonths(prependBatchCount);
         }
         const containerRect = container.getBoundingClientRect();
         const containerCenterY = containerRect.top + container.clientHeight / 2;
@@ -303,7 +344,7 @@ export function PhotoCalendarScrollView({
         let bestKey = activeMonthKeyRef.current;
         let bestDelta = Number.POSITIVE_INFINITY;
 
-        for (const key of monthKeys) {
+        for (const key of renderKeys) {
           const node = monthRefs.current.get(key);
           if (!node) continue;
           const rect = node.getBoundingClientRect();
@@ -344,9 +385,9 @@ export function PhotoCalendarScrollView({
       container.removeEventListener('scroll', onScroll);
       if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
     };
-  }, [monthKeys, monthKey, scroll]);
+  }, [monthKeys, monthKey, scroll, activationHysteresisPx, armThresholdPx, triggerThresholdPx, prependBatchCount]);
 
-  const snapshots = useMemo(() => monthKeys.map((key) => scroll.getMonthSnapshot(key)), [monthKeys, scroll]);
+  const snapshots = useMemo(() => renderKeys.map((key) => scroll.getMonthSnapshot(key)), [renderKeys, scroll]);
   const activeSnapshot = snapshots.find((s) => s.monthKey === activeMonthKey) ?? scroll.getMonthSnapshot(activeMonthKey);
 
   const { role: roleProp, ['aria-label']: ariaLabelProp, ...containerProps } = rest;
@@ -364,7 +405,7 @@ export function PhotoCalendarScrollView({
         className={containerClassName}
         ref={containerRef}
       >
-        <div ref={topSentinelRef} aria-hidden="true" className="calendar-scroll-sentinel" />
+        <div aria-hidden="true" style={{ height: topSpacerHeight }} />
         {snapshots.map((snapshot) => {
           const isActive = snapshot.monthKey === activeMonthKey;
           const headerId = `calendar-month-${snapshot.monthKey}`;
@@ -399,7 +440,7 @@ export function PhotoCalendarScrollView({
             </section>
           );
         })}
-        <div ref={bottomSentinelRef} aria-hidden="true" className="calendar-scroll-sentinel" />
+        <div aria-hidden="true" style={{ height: bottomSpacerHeight }} />
         {children}
       </div>
     </div>

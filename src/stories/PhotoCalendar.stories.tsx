@@ -134,6 +134,44 @@ export const MobileScrollNavigation = () => (
   </div>
 );
 
+export const MobileScrollTuning = (args: any) => (
+  <div
+    style={{
+      maxWidth: 420,
+      height: 640,
+      margin: '0 auto',
+      borderRadius: 16,
+      border: '1px solid rgba(0,0,0,0.1)',
+      overflow: 'hidden',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+    }}
+  >
+    <PhotoCalendar
+      defaultMonthKey={currentMonthKey}
+      entries={sampleEntries}
+      navigationMode="scroll"
+      style={{ height: '100%' }}
+      scrollMaxRenderedMonths={args.scrollMaxRenderedMonths}
+      scrollEstimatedMonthHeight={args.scrollEstimatedMonthHeight}
+      scrollOverscanPx={args.scrollOverscanPx}
+      scrollActivationHysteresisPx={args.scrollActivationHysteresisPx}
+      scrollArmThresholdPx={args.scrollArmThresholdPx}
+      scrollTriggerThresholdPx={args.scrollTriggerThresholdPx}
+      scrollPrependBatchCount={args.scrollPrependBatchCount}
+    />
+  </div>
+);
+
+MobileScrollTuning.args = {
+  scrollMaxRenderedMonths: 9,
+  scrollEstimatedMonthHeight: 600,
+  scrollOverscanPx: 320,
+  scrollActivationHysteresisPx: 48,
+  scrollArmThresholdPx: 240,
+  scrollTriggerThresholdPx: 48,
+  scrollPrependBatchCount: 4,
+};
+
 export const NavigationPrimitives = () => (
   <PhotoCalendarRoot entries={sampleEntries} defaultMonthKey={currentMonthKey}>
     {() => (

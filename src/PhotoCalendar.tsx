@@ -95,6 +95,30 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    * Maximum number of months to keep mounted when `navigationMode` is "scroll".
    */
   scrollMaxRenderedMonths?: number;
+  /**
+   * Estimated month section height used by the virtualizer before measurement.
+   */
+  scrollEstimatedMonthHeight?: number;
+  /**
+   * Overscan distance in pixels before/after viewport for the virtualizer.
+   */
+  scrollOverscanPx?: number;
+  /**
+   * Hysteresis threshold (px) for switching the active month near the center.
+   */
+  scrollActivationHysteresisPx?: number;
+  /**
+   * ScrollTop needed (px) to re-arm a prepend after moving away from the top.
+   */
+  scrollArmThresholdPx?: number;
+  /**
+   * Near-top threshold (px) to trigger a prepend when armed.
+   */
+  scrollTriggerThresholdPx?: number;
+  /**
+   * Number of months to prepend in one batch when near top.
+   */
+  scrollPrependBatchCount?: number;
 }
 
 export function PhotoCalendar({
@@ -118,6 +142,12 @@ export function PhotoCalendar({
   children,
   navigationMode = 'controls',
   scrollMaxRenderedMonths,
+  scrollEstimatedMonthHeight,
+  scrollOverscanPx,
+  scrollActivationHysteresisPx,
+  scrollArmThresholdPx,
+  scrollTriggerThresholdPx,
+  scrollPrependBatchCount,
   ...rest
 }: PhotoCalendarProps) {
   const calendarOptions = {
@@ -158,6 +188,12 @@ export function PhotoCalendar({
             renderDay={resolvedRenderDay}
             renderWeekdays={resolvedWeekdays}
             maxRenderedMonths={scrollMaxRenderedMonths}
+            estimatedMonthHeight={scrollEstimatedMonthHeight}
+            overscanPx={scrollOverscanPx}
+            activationHysteresisPx={scrollActivationHysteresisPx}
+            armThresholdPx={scrollArmThresholdPx}
+            triggerThresholdPx={scrollTriggerThresholdPx}
+            prependBatchCount={scrollPrependBatchCount}
           >
             {children}
           </PhotoCalendarScrollView>
