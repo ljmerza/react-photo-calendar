@@ -45,14 +45,25 @@ export function PhotoCalendarScrollView({
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
   const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
   const monthRefs = useRef<Map<string, HTMLElement>>(new Map());
+  // Compute a dynamic cap: do not create or extend into future months beyond "today"
+  const now = new Date();
+  const todayKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const toIndex = (key: string) => {
+    const [y, m] = key.split('-').map(Number);
+    return y * 12 + (m - 1);
+  };
+  const todayIndex = toIndex(todayKey);
+  const clampToToday = (key: string) => (toIndex(key) > todayIndex ? todayKey : key);
+  const isNotInFuture = (key: string | null) => (key ? toIndex(key) <= todayIndex : false);
 
   const maxMountedMonths = Math.max(1, maxRenderedMonths);
 
   const buildWindow = useCallback(
     (centerKey: string, targetSize: number) => {
-      const keys: string[] = [centerKey];
+      const center = clampToToday(centerKey);
+      const keys: string[] = [center];
       let prevKey = centerKey;
-      let nextKey = centerKey;
+      let nextKey = center;
       while (keys.length < targetSize) {
         const prevCandidate = scroll.getAdjacentMonthKey(prevKey, -1);
         const nextCandidate = scroll.getAdjacentMonthKey(nextKey, 1);
@@ -61,7 +72,7 @@ export function PhotoCalendarScrollView({
           prevKey = prevCandidate;
         }
         if (keys.length >= targetSize) break;
-        if (nextCandidate && !keys.includes(nextCandidate)) {
+        if (nextCandidate && !keys.includes(nextCandidate) && isNotInFuture(nextCandidate)) {
           keys.push(nextCandidate);
           nextKey = nextCandidate;
         }
@@ -101,6 +112,7 @@ export function PhotoCalendarScrollView({
         const delta = direction === 'prev' ? -1 : 1;
         const adjacent = scroll.getAdjacentMonthKey(pivot, delta);
         if (!adjacent || prev.includes(adjacent)) return prev;
+        if (direction === 'next' && !isNotInFuture(adjacent)) return prev;
         const next = direction === 'prev' ? [adjacent, ...prev] : [...prev, adjacent];
         if (next.length <= maxMountedMonths) return next;
         return direction === 'prev' ? next.slice(0, maxMountedMonths) : next.slice(next.length - maxMountedMonths);
@@ -111,7 +123,8 @@ export function PhotoCalendarScrollView({
 
   const ensureMonthInWindow = useCallback(
     (targetKey: string) => {
-      setMonthKeys((prev) => (prev.includes(targetKey) ? prev : buildWindow(targetKey, maxMountedMonths)));
+      const clamped = clampToToday(targetKey);
+      setMonthKeys((prev) => (prev.includes(clamped) ? prev : buildWindow(clamped, maxMountedMonths)));
     },
     [buildWindow, maxMountedMonths]
   );
@@ -123,31 +136,37 @@ export function PhotoCalendarScrollView({
   const lastScrollSyncRef = useRef<string | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const sectionHeightsRef = useRef<Map<string, number>>(new Map());
+  const extendBusyRef = useRef(false);
+  const lastExtendAtRef = useRef(0);
 
   const scrollToMonthKey = useCallback((targetKey: string, behavior: ScrollBehavior = 'smooth') => {
     const node = monthRefs.current.get(targetKey);
     const container = containerRef.current;
     if (!node || !container) return;
-    if (typeof node.scrollIntoView === 'function') {
-      node.scrollIntoView({ block: 'start', behavior });
+    const targetTop = node.offsetTop - container.offsetTop;
+    const targetCenter = targetTop + node.offsetHeight / 2;
+    const containerCenter = container.clientHeight / 2;
+    const desiredScrollTop = Math.max(0, targetCenter - containerCenter);
+    if (behavior === 'smooth') {
+      container.scrollTo({ top: desiredScrollTop, behavior: 'smooth' });
     } else {
-      const offsetTop = node.offsetTop - container.offsetTop;
-      container.scrollTop = offsetTop;
+      container.scrollTop = desiredScrollTop;
     }
   }, []);
 
   // Initial alignment
   useEffect(() => {
-    ensureMonthInWindow(monthKey);
+    const clampedKey = clampToToday(monthKey);
+    ensureMonthInWindow(clampedKey);
     if (hasAlignedInitialRef.current) return;
     const id = requestAnimationFrame(() => {
       hasAlignedInitialRef.current = true;
-      if (activeMonthKeyRef.current !== monthKey) {
-        activeMonthKeyRef.current = monthKey;
-        setActiveMonthKey(monthKey);
+      if (activeMonthKeyRef.current !== clampedKey) {
+        activeMonthKeyRef.current = clampedKey;
+        setActiveMonthKey(clampedKey);
       }
       isProgrammaticScrollRef.current = true;
-      scrollToMonthKey(monthKey, 'auto');
+      scrollToMonthKey(clampedKey, 'auto');
       requestAnimationFrame(() => {
         isProgrammaticScrollRef.current = false;
       });
@@ -158,17 +177,18 @@ export function PhotoCalendarScrollView({
   // External monthKey changes
   useEffect(() => {
     if (!hasAlignedInitialRef.current) return;
-    if (lastScrollSyncRef.current === monthKey) {
+    const clampedKey = clampToToday(monthKey);
+    if (lastScrollSyncRef.current === clampedKey) {
       lastScrollSyncRef.current = null;
       return;
     }
-    ensureMonthInWindow(monthKey);
-    if (activeMonthKeyRef.current !== monthKey) {
-      activeMonthKeyRef.current = monthKey;
-      setActiveMonthKey(monthKey);
+    ensureMonthInWindow(clampedKey);
+    if (activeMonthKeyRef.current !== clampedKey) {
+      activeMonthKeyRef.current = clampedKey;
+      setActiveMonthKey(clampedKey);
     }
     isProgrammaticScrollRef.current = true;
-    scrollToMonthKey(monthKey);
+    scrollToMonthKey(clampedKey);
     requestAnimationFrame(() => {
       isProgrammaticScrollRef.current = false;
     });
@@ -194,7 +214,42 @@ export function PhotoCalendarScrollView({
     });
   }, [visibleSet, monthRefs]);
 
-  // Window expansion via IntersectionObserver
+  // Extend window with scroll position compensation when prepending months
+  const extendWindowWithCompensation = useCallback((direction: 'prev' | 'next') => {
+    const nowTs = performance.now?.() ?? Date.now();
+    if (extendBusyRef.current && nowTs - lastExtendAtRef.current < 120) return;
+    extendBusyRef.current = true;
+    lastExtendAtRef.current = nowTs;
+
+    const root = containerRef.current;
+    if (!root) {
+      extendWindow(direction);
+      extendBusyRef.current = false;
+      return;
+    }
+    if (direction === 'prev') {
+      const prevHeight = root.scrollHeight;
+      const prevTop = root.scrollTop;
+      extendWindow('prev');
+      requestAnimationFrame(() => {
+        const delta = root.scrollHeight - prevHeight;
+        if (delta > 0) {
+          root.scrollTop = prevTop + delta;
+        }
+        // release on next frame to avoid rapid re-entry
+        requestAnimationFrame(() => {
+          extendBusyRef.current = false;
+        });
+      });
+    } else {
+      extendWindow('next');
+      requestAnimationFrame(() => {
+        extendBusyRef.current = false;
+      });
+    }
+  }, [extendWindow]);
+
+  // Window expansion via IntersectionObserver (bottom only)
   useEffect(() => {
     const root = containerRef.current;
     const top = topSentinelRef.current;
@@ -202,22 +257,23 @@ export function PhotoCalendarScrollView({
     if (!root || !top || !bottom || typeof IntersectionObserver === 'undefined') return;
     let rafId: number | null = null;
     let observer: IntersectionObserver | null = null;
+    let bottomWasIntersecting = false;
     const start = () => {
       observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            if (entry.target === top) {
-              if (root.scrollTop === 0) return;
-              extendWindow('prev');
-            } else if (entry.target === bottom) {
-              extendWindow('next');
+            if (entry.target === bottom) {
+              if (entry.isIntersecting && !bottomWasIntersecting) {
+                bottomWasIntersecting = true;
+                extendWindowWithCompensation('next');
+              } else if (!entry.isIntersecting && bottomWasIntersecting) {
+                bottomWasIntersecting = false;
+              }
             }
           });
         },
-        { root, threshold: 0.1 }
+        { root, threshold: 0 }
       );
-      observer.observe(top);
       observer.observe(bottom);
     };
     rafId = requestAnimationFrame(start);
@@ -225,31 +281,58 @@ export function PhotoCalendarScrollView({
       if (rafId) cancelAnimationFrame(rafId);
       observer?.disconnect();
     };
-  }, [extendWindow]);
+  }, [extendWindowWithCompensation]);
 
-  // Active month tracking on scroll
+  // Active month tracking on scroll (center-based)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    const HYSTERESIS_PX = Math.max(24, Math.floor(container.clientHeight * 0.1));
     const onScroll = () => {
       if (isProgrammaticScrollRef.current) return;
       if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
       scrollFrameRef.current = requestAnimationFrame(() => {
         scrollFrameRef.current = null;
-        const containerTop = container.getBoundingClientRect().top;
-        let nextActive = monthKeys[0] ?? activeMonthKeyRef.current;
+        // Near-top check: extend previous month(s) when user approaches the top
+        if (container.scrollTop <= 48) {
+          extendWindowWithCompensation('prev');
+        }
+        const containerRect = container.getBoundingClientRect();
+        const containerCenterY = containerRect.top + container.clientHeight / 2;
+
+        let bestKey = activeMonthKeyRef.current;
+        let bestDelta = Number.POSITIVE_INFINITY;
+
         for (const key of monthKeys) {
           const node = monthRefs.current.get(key);
           if (!node) continue;
           const rect = node.getBoundingClientRect();
-          if (rect.top - containerTop <= 2) nextActive = key; else break;
+          const sectionCenterY = rect.top + rect.height / 2;
+          const delta = Math.abs(sectionCenterY - containerCenterY);
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestKey = key;
+          }
         }
-        if (nextActive !== activeMonthKeyRef.current) {
-          activeMonthKeyRef.current = nextActive;
-          setActiveMonthKey(nextActive);
-          if (nextActive !== monthKey) {
-            lastScrollSyncRef.current = nextActive;
-            scroll.syncVisibleMonth(nextActive);
+
+        // Hysteresis: switch only when significantly closer than current
+        if (bestKey !== activeMonthKeyRef.current) {
+          // Only switch if improvement exceeds hysteresis or current is out of view
+          const currentNode = monthRefs.current.get(activeMonthKeyRef.current);
+          let shouldSwitch = true;
+          if (currentNode) {
+            const r = currentNode.getBoundingClientRect();
+            const currentDelta = Math.abs((r.top + r.height / 2) - containerCenterY);
+            shouldSwitch = bestDelta + 1 < currentDelta - HYSTERESIS_PX;
+          }
+          if (shouldSwitch) {
+            activeMonthKeyRef.current = bestKey;
+            setActiveMonthKey(bestKey);
+            const clampedKey = clampToToday(monthKey);
+            if (bestKey !== clampedKey) {
+              lastScrollSyncRef.current = bestKey;
+              scroll.syncVisibleMonth(bestKey);
+            }
           }
         }
       });

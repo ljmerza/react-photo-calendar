@@ -46,8 +46,6 @@ export function useCalendarWindowExpansionObserver({
               return;
             }
             if (entry.target === topSentinel) {
-              // Avoid aggressive backwards expansion when scroller is at top
-              if (root.scrollTop === 0) return;
               extendWindow('prev');
             } else if (entry.target === bottomSentinel) {
               extendWindow('next');
