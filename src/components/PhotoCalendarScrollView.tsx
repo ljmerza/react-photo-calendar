@@ -4,6 +4,7 @@ import { usePhotoCalendarContext } from '../context/PhotoCalendarContext';
 import { PhotoCalendarMonthGrid } from '../primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarWeekdays, type WeekdayRenderProps } from '../primitives/PhotoCalendarWeekdays';
 import type { DayRenderProps } from '../types/calendar';
+import { useCalendarMonthVisibility } from '../hooks/useCalendarMonthVisibility';
 
 export interface PhotoCalendarScrollViewProps extends HTMLAttributes<HTMLDivElement> {
   /**
@@ -121,6 +122,7 @@ export function PhotoCalendarScrollView({
   const hasAlignedInitialRef = useRef(false);
   const lastScrollSyncRef = useRef<string | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
+  const sectionHeightsRef = useRef<Map<string, number>>(new Map());
 
   const scrollToMonthKey = useCallback((targetKey: string, behavior: ScrollBehavior = 'smooth') => {
     const node = monthRefs.current.get(targetKey);
@@ -171,6 +173,26 @@ export function PhotoCalendarScrollView({
       isProgrammaticScrollRef.current = false;
     });
   }, [ensureMonthInWindow, monthKey, scrollToMonthKey]);
+
+  // Only render the heavy month grid when the section is actually visible
+  const visibleSet = useCalendarMonthVisibility({
+    containerRef,
+    monthRefs,
+    monthKeys,
+    threshold: 0.01,
+  });
+
+  // Cache measured section heights for offscreen placeholders
+  useEffect(() => {
+    visibleSet.forEach((key) => {
+      const node = monthRefs.current.get(key);
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      if (rect.height > 0) {
+        sectionHeightsRef.current.set(key, rect.height);
+      }
+    });
+  }, [visibleSet, monthRefs]);
 
   // Window expansion via IntersectionObserver
   useEffect(() => {
@@ -263,6 +285,7 @@ export function PhotoCalendarScrollView({
         {snapshots.map((snapshot) => {
           const isActive = snapshot.monthKey === activeMonthKey;
           const headerId = `calendar-month-${snapshot.monthKey}`;
+          const isVisible = visibleSet.has(snapshot.monthKey);
 
           return (
             <section
@@ -282,8 +305,14 @@ export function PhotoCalendarScrollView({
               >
                 <strong>{snapshot.monthLabel}</strong>
               </div>
-              <PhotoCalendarWeekdays>{renderWeekdays}</PhotoCalendarWeekdays>
-              <PhotoCalendarMonthGrid renderDay={renderDay} dayStates={snapshot.dayStates} />
+              {isVisible ? (
+                <>
+                  <PhotoCalendarWeekdays>{renderWeekdays}</PhotoCalendarWeekdays>
+                  <PhotoCalendarMonthGrid renderDay={renderDay} dayStates={snapshot.dayStates} />
+                </>
+              ) : (
+                <div aria-hidden="true" style={{ height: sectionHeightsRef.current.get(snapshot.monthKey) ?? 480 }} />
+              )}
             </section>
           );
         })}

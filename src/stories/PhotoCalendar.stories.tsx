@@ -128,7 +128,7 @@ export const MobileScrollNavigation = () => (
       defaultMonthKey={currentMonthKey}
       entries={sampleEntries}
       navigationMode="scroll"
-      scrollMaxRenderedMonths={7}
+      scrollMaxRenderedMonths={5}
       style={{ height: '100%' }}
     />
   </div>
