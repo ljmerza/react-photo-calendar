@@ -1,10 +1,10 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { usePhotoCalendarContext } from '../context/PhotoCalendarContext';
 import { PhotoCalendarMonthGrid } from '../primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarWeekdays, type WeekdayRenderProps } from '../primitives/PhotoCalendarWeekdays';
 import type { DayRenderProps } from '../types/calendar';
-import { useCalendarMonthVisibility } from '../hooks/useCalendarMonthVisibility';
 
 export interface PhotoCalendarScrollViewProps extends HTMLAttributes<HTMLDivElement> {
   /**
@@ -27,6 +27,7 @@ export interface PhotoCalendarScrollViewProps extends HTMLAttributes<HTMLDivElem
 }
 
 const DEFAULT_MAX_RENDERED_MONTHS = 7;
+const ESTIMATED_MONTH_HEIGHT = 560;
 
 function combineClassName(base: string, additional?: string) {
   return additional ? `${base} ${additional}` : base;
@@ -42,229 +43,177 @@ export function PhotoCalendarScrollView({
 }: PhotoCalendarScrollViewProps) {
   const { monthKey, scroll } = usePhotoCalendarContext('PhotoCalendarScrollView');
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const topSentinelRef = useRef<HTMLDivElement | null>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
-  const monthRefs = useRef<Map<string, HTMLElement>>(new Map());
-
-  const maxMountedMonths = Math.max(1, maxRenderedMonths);
-
-  const buildWindow = useCallback(
-    (centerKey: string, targetSize: number) => {
-      const keys: string[] = [centerKey];
-      let prevKey = centerKey;
-      let nextKey = centerKey;
-      while (keys.length < targetSize) {
-        const prevCandidate = scroll.getAdjacentMonthKey(prevKey, -1);
-        const nextCandidate = scroll.getAdjacentMonthKey(nextKey, 1);
-        if (prevCandidate && !keys.includes(prevCandidate)) {
-          keys.unshift(prevCandidate);
-          prevKey = prevCandidate;
-        }
-        if (keys.length >= targetSize) break;
-        if (nextCandidate && !keys.includes(nextCandidate)) {
-          keys.push(nextCandidate);
-          nextKey = nextCandidate;
-        }
-        if (!prevCandidate && !nextCandidate) break;
-      }
-      return keys;
-    },
-    [scroll]
-  );
-
-  const [monthKeys, setMonthKeys] = useState<string[]>(() =>
-    buildWindow(monthKey, Math.min(3, maxMountedMonths))
-  );
-
-  useEffect(() => {
-    monthRefs.current.forEach((_node, key) => {
-      if (!monthKeys.includes(key)) monthRefs.current.delete(key);
-    });
-  }, [monthKeys]);
-
-  const registerMonthRef = useCallback(
-    (key: string) => (node: HTMLElement | null) => {
-      if (!node) {
-        monthRefs.current.delete(key);
-        return;
-      }
-      monthRefs.current.set(key, node);
-    },
-    []
-  );
-
-  const extendWindow = useCallback(
-    (direction: 'prev' | 'next') => {
-      setMonthKeys((prev) => {
-        if (prev.length === 0) return prev;
-        const pivot = direction === 'prev' ? prev[0] : prev[prev.length - 1];
-        const delta = direction === 'prev' ? -1 : 1;
-        const adjacent = scroll.getAdjacentMonthKey(pivot, delta);
-        if (!adjacent || prev.includes(adjacent)) return prev;
-        const next = direction === 'prev' ? [adjacent, ...prev] : [...prev, adjacent];
-        if (next.length <= maxMountedMonths) return next;
-        return direction === 'prev' ? next.slice(0, maxMountedMonths) : next.slice(next.length - maxMountedMonths);
-      });
-    },
-    [maxMountedMonths, scroll]
-  );
-
-  const ensureMonthInWindow = useCallback(
-    (targetKey: string) => {
-      setMonthKeys((prev) => (prev.includes(targetKey) ? prev : buildWindow(targetKey, maxMountedMonths)));
-    },
-    [buildWindow, maxMountedMonths]
-  );
-
   const [activeMonthKey, setActiveMonthKey] = useState<string>(monthKey);
   const activeMonthKeyRef = useRef(activeMonthKey);
   const isProgrammaticScrollRef = useRef(false);
   const hasAlignedInitialRef = useRef(false);
   const lastScrollSyncRef = useRef<string | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
-  const sectionHeightsRef = useRef<Map<string, number>>(new Map());
-
-  const scrollToMonthKey = useCallback((targetKey: string, behavior: ScrollBehavior = 'smooth') => {
-    const node = monthRefs.current.get(targetKey);
-    const container = containerRef.current;
-    if (!node || !container) return;
-    if (typeof node.scrollIntoView === 'function') {
-      node.scrollIntoView({ block: 'start', behavior });
-    } else {
-      const offsetTop = node.offsetTop - container.offsetTop;
-      container.scrollTop = offsetTop;
+  const evaluateActiveMonthRef = useRef<() => void>(() => {});
+  const monthOrder = useMemo(() => {
+    const seeds: string[] = [];
+    const seen = new Set<string>();
+    if (monthKey) {
+      seeds.push(monthKey);
+      seen.add(monthKey);
     }
-  }, []);
+    let prevCursor = monthKey;
+    while (prevCursor) {
+      const prevCandidate = scroll.getAdjacentMonthKey(prevCursor, -1);
+      if (!prevCandidate || seen.has(prevCandidate)) break;
+      seeds.unshift(prevCandidate);
+      seen.add(prevCandidate);
+      prevCursor = prevCandidate;
+    }
+    let nextCursor = monthKey;
+    while (nextCursor) {
+      const nextCandidate = scroll.getAdjacentMonthKey(nextCursor, 1);
+      if (!nextCandidate || seen.has(nextCandidate)) break;
+      seeds.push(nextCandidate);
+      seen.add(nextCandidate);
+      nextCursor = nextCandidate;
+    }
+    return seeds;
+  }, [monthKey, scroll]);
 
-  // Initial alignment
+  const monthIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    monthOrder.forEach((key, index) => {
+      map.set(key, index);
+    });
+    return map;
+  }, [monthOrder]);
+
+  const resolvedOverscan = useMemo(() => {
+    const effectiveMax = Math.max(1, maxRenderedMonths);
+    return Math.max(1, Math.floor((effectiveMax - 1) / 2));
+  }, [maxRenderedMonths]);
+
+  const virtualizer = useVirtualizer({
+    count: monthOrder.length,
+    getItemKey: (index) => monthOrder[index],
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => ESTIMATED_MONTH_HEIGHT,
+    overscan: resolvedOverscan,
+    onChange: () => {
+      evaluateActiveMonthRef.current();
+    },
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  const scrollToMonthKey = useCallback(
+    (targetKey: string, behavior: 'auto' | 'smooth') => {
+      const targetIndex = monthIndexMap.get(targetKey);
+      if (targetIndex === undefined) {
+        return;
+      }
+      isProgrammaticScrollRef.current = true;
+      virtualizer.scrollToIndex(targetIndex, { align: 'start', behavior });
+      requestAnimationFrame(() => {
+        isProgrammaticScrollRef.current = false;
+      });
+    },
+    [monthIndexMap, virtualizer]
+  );
+
   useEffect(() => {
-    ensureMonthInWindow(monthKey);
-    if (hasAlignedInitialRef.current) return;
-    const id = requestAnimationFrame(() => {
+    const targetIndex = monthIndexMap.get(monthKey);
+    if (targetIndex === undefined) {
+      return;
+    }
+    if (!hasAlignedInitialRef.current) {
       hasAlignedInitialRef.current = true;
       if (activeMonthKeyRef.current !== monthKey) {
         activeMonthKeyRef.current = monthKey;
         setActiveMonthKey(monthKey);
       }
-      isProgrammaticScrollRef.current = true;
       scrollToMonthKey(monthKey, 'auto');
-      requestAnimationFrame(() => {
-        isProgrammaticScrollRef.current = false;
-      });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [ensureMonthInWindow, monthKey, scrollToMonthKey]);
+      return;
+    }
 
-  // External monthKey changes
-  useEffect(() => {
-    if (!hasAlignedInitialRef.current) return;
     if (lastScrollSyncRef.current === monthKey) {
       lastScrollSyncRef.current = null;
       return;
     }
-    ensureMonthInWindow(monthKey);
+
     if (activeMonthKeyRef.current !== monthKey) {
       activeMonthKeyRef.current = monthKey;
       setActiveMonthKey(monthKey);
     }
-    isProgrammaticScrollRef.current = true;
-    scrollToMonthKey(monthKey);
-    requestAnimationFrame(() => {
-      isProgrammaticScrollRef.current = false;
-    });
-  }, [ensureMonthInWindow, monthKey, scrollToMonthKey]);
 
-  // Only render the heavy month grid when the section is actually visible
-  const visibleSet = useCalendarMonthVisibility({
-    containerRef,
-    monthRefs,
-    monthKeys,
-    threshold: 0.01,
-  });
+    scrollToMonthKey(monthKey, 'smooth');
+  }, [monthIndexMap, monthKey, scrollToMonthKey]);
 
-  // Cache measured section heights for offscreen placeholders
-  useEffect(() => {
-    visibleSet.forEach((key) => {
-      const node = monthRefs.current.get(key);
-      if (!node) return;
-      const rect = node.getBoundingClientRect();
-      if (rect.height > 0) {
-        sectionHeightsRef.current.set(key, rect.height);
+  const evaluateActiveMonth = useCallback(() => {
+    if (!hasAlignedInitialRef.current) {
+      return;
+    }
+    if (isProgrammaticScrollRef.current) {
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    const currentItems = virtualizer.getVirtualItems();
+    if (currentItems.length === 0) {
+      return;
+    }
+    const offset = container.scrollTop;
+    let nextActiveKey = monthOrder[currentItems[0]?.index ?? 0] ?? activeMonthKeyRef.current;
+    for (const item of currentItems) {
+      const key = monthOrder[item.index];
+      if (!key) continue;
+      if (item.start <= offset + 1) {
+        nextActiveKey = key;
+      } else {
+        break;
       }
-    });
-  }, [visibleSet, monthRefs]);
+    }
+    if (!nextActiveKey || nextActiveKey === activeMonthKeyRef.current) {
+      return;
+    }
+    activeMonthKeyRef.current = nextActiveKey;
+    setActiveMonthKey(nextActiveKey);
+    if (nextActiveKey !== monthKey) {
+      lastScrollSyncRef.current = nextActiveKey;
+      scroll.syncVisibleMonth(nextActiveKey);
+    }
+  }, [monthKey, monthOrder, scroll, virtualizer]);
 
-  // Window expansion via IntersectionObserver
-  useEffect(() => {
-    const root = containerRef.current;
-    const top = topSentinelRef.current;
-    const bottom = bottomSentinelRef.current;
-    if (!root || !top || !bottom || typeof IntersectionObserver === 'undefined') return;
-    let rafId: number | null = null;
-    let observer: IntersectionObserver | null = null;
-    const start = () => {
-      observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            if (entry.target === top) {
-              if (root.scrollTop === 0) return;
-              extendWindow('prev');
-            } else if (entry.target === bottom) {
-              extendWindow('next');
-            }
-          });
-        },
-        { root, threshold: 0.1 }
-      );
-      observer.observe(top);
-      observer.observe(bottom);
-    };
-    rafId = requestAnimationFrame(start);
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      observer?.disconnect();
-    };
-  }, [extendWindow]);
+  evaluateActiveMonthRef.current = evaluateActiveMonth;
 
-  // Active month tracking on scroll
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const onScroll = () => {
-      if (isProgrammaticScrollRef.current) return;
-      if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+    if (!container) {
+      return;
+    }
+    const handleScroll = () => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
       scrollFrameRef.current = requestAnimationFrame(() => {
         scrollFrameRef.current = null;
-        const containerTop = container.getBoundingClientRect().top;
-        let nextActive = monthKeys[0] ?? activeMonthKeyRef.current;
-        for (const key of monthKeys) {
-          const node = monthRefs.current.get(key);
-          if (!node) continue;
-          const rect = node.getBoundingClientRect();
-          if (rect.top - containerTop <= 2) nextActive = key; else break;
-        }
-        if (nextActive !== activeMonthKeyRef.current) {
-          activeMonthKeyRef.current = nextActive;
-          setActiveMonthKey(nextActive);
-          if (nextActive !== monthKey) {
-            lastScrollSyncRef.current = nextActive;
-            scroll.syncVisibleMonth(nextActive);
-          }
-        }
+        evaluateActiveMonth();
       });
     };
-    container.addEventListener('scroll', onScroll, { passive: true });
-    // fire once in case initial viewport already shows multiple months
-    onScroll();
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => {
-      container.removeEventListener('scroll', onScroll);
-      if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
     };
-  }, [monthKeys, monthKey, scroll]);
+  }, [evaluateActiveMonth]);
 
-  const snapshots = useMemo(() => monthKeys.map((key) => scroll.getMonthSnapshot(key)), [monthKeys, scroll]);
-  const activeSnapshot = snapshots.find((s) => s.monthKey === activeMonthKey) ?? scroll.getMonthSnapshot(activeMonthKey);
+  const activeSnapshot = useMemo(
+    () => scroll.getMonthSnapshot(activeMonthKey),
+    [activeMonthKey, scroll]
+  );
 
   const { role: roleProp, ['aria-label']: ariaLabelProp, ...containerProps } = rest;
   const role = roleProp ?? 'grid';
@@ -281,42 +230,52 @@ export function PhotoCalendarScrollView({
         className={containerClassName}
         ref={containerRef}
       >
-        <div ref={topSentinelRef} aria-hidden="true" className="calendar-scroll-sentinel" />
-        {snapshots.map((snapshot) => {
-          const isActive = snapshot.monthKey === activeMonthKey;
-          const headerId = `calendar-month-${snapshot.monthKey}`;
-          const isVisible = visibleSet.has(snapshot.monthKey);
-
-          return (
-            <section
-              key={snapshot.monthKey}
-              className="calendar-month-section"
-              data-month-key={snapshot.monthKey}
-              aria-labelledby={`${headerId}-header`}
-              ref={registerMonthRef(snapshot.monthKey)}
-            >
-              <div
-                id={`${headerId}-header`}
-                className={combineClassName(
-                  'calendar-month-header',
-                  isActive ? 'calendar-month-header--active' : undefined
-                )}
-                aria-current={isActive ? 'date' : undefined}
+        <div
+          style={{
+            height: virtualizer.getTotalSize(),
+            position: 'relative',
+            width: '100%',
+          }}
+        >
+          {virtualItems.map((virtualItem) => {
+            const snapshotKey = monthOrder[virtualItem.index];
+            const snapshot = snapshotKey ? scroll.getMonthSnapshot(snapshotKey) : null;
+            if (!snapshot) {
+              return null;
+            }
+            const isActive = snapshot.monthKey === activeMonthKey;
+            const headerId = `calendar-month-${snapshot.monthKey}`;
+            return (
+              <section
+                key={virtualItem.key}
+                data-month-key={snapshot.monthKey}
+                aria-labelledby={`${headerId}-header`}
+                className="calendar-month-section"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
               >
-                <strong>{snapshot.monthLabel}</strong>
-              </div>
-              {isVisible ? (
-                <>
-                  <PhotoCalendarWeekdays>{renderWeekdays}</PhotoCalendarWeekdays>
-                  <PhotoCalendarMonthGrid renderDay={renderDay} dayStates={snapshot.dayStates} />
-                </>
-              ) : (
-                <div aria-hidden="true" style={{ height: sectionHeightsRef.current.get(snapshot.monthKey) ?? 480 }} />
-              )}
-            </section>
-          );
-        })}
-        <div ref={bottomSentinelRef} aria-hidden="true" className="calendar-scroll-sentinel" />
+                <div
+                  id={`${headerId}-header`}
+                  className={combineClassName(
+                    'calendar-month-header',
+                    isActive ? 'calendar-month-header--active' : undefined
+                  )}
+                  aria-current={isActive ? 'date' : undefined}
+                >
+                  <strong>{snapshot.monthLabel}</strong>
+                </div>
+                <PhotoCalendarWeekdays>{renderWeekdays}</PhotoCalendarWeekdays>
+                <PhotoCalendarMonthGrid renderDay={renderDay} dayStates={snapshot.dayStates} />
+              </section>
+            );
+          })}
+        </div>
         {children}
       </div>
     </div>
