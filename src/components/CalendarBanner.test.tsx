@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CalendarBanner } from './CalendarBanner';
 import { PhotoCalendarContextProvider } from '../context/PhotoCalendarContext';
 import type { PhotoCalendarNavigationState, PhotoCalendarScrollState, PhotoCalendarState } from '../hooks/usePhotoCalendarState';
+
+afterEach(() => cleanup());
 
 function createNavigation(overrides: Partial<PhotoCalendarNavigationState> = {}): PhotoCalendarNavigationState {
   return {

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@tinybeans/photo-calendar': resolve(__dirname, 'src/index.ts')
+      'react-photo-calendar': resolve(__dirname, 'src/index.ts')
     }
   },
   build: {
@@ -14,7 +14,10 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'PhotoCalendar',
       formats: ['es', 'cjs'],
-      fileName: (format) => `photo-calendar.${format === 'es' ? 'mjs' : 'cjs'}`
+      fileName: (format) => `photo-calendar.${format === 'es' ? 'mjs' : 'cjs'}`,
+      // Without this Vite names the CSS after the package, which would break
+      // the "./styles.css" entry in the exports map.
+      cssFileName: 'photo-calendar'
     },
     rollupOptions: {
       external: ['react', 'react-dom'],
