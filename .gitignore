@@ -10,3 +10,4 @@ dist
 coverage
 
 console.log
+storybook-static

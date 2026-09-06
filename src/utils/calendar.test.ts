@@ -32,7 +32,7 @@ describe('calendar utilities', () => {
     expect(cells[0].inCurrentMonth).toBe(false);
     expect(cells[1].isoDate).toBe('2030-01-01');
     expect(cells[1].inCurrentMonth).toBe(true);
-    expect(cells[cells.length - 1].isoDate).toBe('2030-02-02');
+    expect(cells[cells.length - 1].isoDate).toBe('2030-02-03');
   });
 
   it('returns a visible range with cloned boundary dates', () => {

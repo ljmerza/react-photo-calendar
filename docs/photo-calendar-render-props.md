@@ -36,7 +36,7 @@ import {
   PhotoCalendarNavigationNextYearButton,
   PhotoCalendarNavigationNextMonthButton,
   PhotoCalendarNavigationTodayButton
-} from '@tinybeans/photo-calendar';
+} from 'react-photo-calendar';
 
 <PhotoCalendarNavigation>
   {() => (
@@ -97,7 +97,7 @@ Each component reads the necessary data from `usePhotoCalendarContext`, so you c
 Need the default button wrapper but want to compose it manually? Import `PhotoCalendarDay` and reuse the computed render props:
 
 ```tsx
-import { PhotoCalendarDay } from '@tinybeans/photo-calendar';
+import { PhotoCalendarDay } from 'react-photo-calendar';
 
 <PhotoCalendarMonthGrid
   renderDay={(props) => (
@@ -134,7 +134,7 @@ The mobile scroll navigation shell is exported as `PhotoCalendarScrollView`. It 
 import {
   PhotoCalendarRoot,
   PhotoCalendarScrollView
-} from '@tinybeans/photo-calendar';
+} from 'react-photo-calendar';
 
 <PhotoCalendarRoot onVisibleMonthChange={console.log}>
   {(state) => (

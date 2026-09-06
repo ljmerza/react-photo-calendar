@@ -1,9 +1,30 @@
-# @tinybeans/photo-calendar (work in progress)
+# react-photo-calendar
 
 This folder hosts the stand-alone React + Vite workspace for the photo calendar
 library. The code will eventually move into its own repository; for now it lives
 alongside the main product so the team can iterate while shaping the public API
 and reference playground.
+
+## Installation
+
+```bash
+npm install react-photo-calendar
+```
+
+`react` and `react-dom` are peer dependencies (`^18.2.0 || ^19.0.0`) — the package
+does not bundle its own copy.
+
+```tsx
+import { PhotoCalendar } from 'react-photo-calendar';
+import 'react-photo-calendar/styles.css'; // optional reference styling
+
+export function App() {
+  return <PhotoCalendar monthKey="2030-01" />;
+}
+```
+
+The stylesheet is optional: the primitives are headless, and `styles.css` only
+carries the reference UI used by the `PhotoCalendar` convenience component.
 
 ## Getting started
 
@@ -47,7 +68,7 @@ import {
   PhotoCalendarMonthGrid,
   PhotoCalendarDay,
   usePhotoCalendarContext,
-} from '@tinybeans/photo-calendar';
+} from 'react-photo-calendar';
 
 function MyNavigation() {
   const { monthLabel } = usePhotoCalendarContext('MyNavigation');
@@ -105,7 +126,7 @@ Each primitive exposes render props so you can override just the pieces you need
 Navigation can also be assembled from the exported buttons and layout helpers (`PhotoCalendarNavigationLayout`, `PhotoCalendarNavigationPrevMonthButton`, etc.), letting you mix stock behaviour with bespoke markup without threading handlers manually.
 
 ```tsx
-import { PhotoCalendar, PhotoCalendarDay } from '@tinybeans/photo-calendar';
+import { PhotoCalendar, PhotoCalendarDay } from 'react-photo-calendar';
 
 <PhotoCalendar
   renderDay={(props) => (
