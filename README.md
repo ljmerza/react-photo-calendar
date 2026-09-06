@@ -1,9 +1,41 @@
 # react-photo-calendar
 
-This folder hosts the stand-alone React + Vite workspace for the photo calendar
-library. The code will eventually move into its own repository; for now it lives
-alongside the main product so the team can iterate while shaping the public API
-and reference playground.
+[![npm](https://img.shields.io/npm/v/react-photo-calendar.svg)](https://www.npmjs.com/package/react-photo-calendar)
+[![CI](https://github.com/ljmerza/react-photo-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/ljmerza/react-photo-calendar/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/react-photo-calendar.svg)](LICENSE)
+
+A React month-view calendar that renders photo thumbnails on each day. Headless
+primitives with a styled reference UI on top, so you can use it as-is or rebuild
+the entire surface without forking.
+
+No runtime dependencies. React 18.2+ or 19 as a peer.
+
+<details>
+<summary><strong>Screenshots</strong></summary>
+
+<br>
+
+**Desktop** — the default component, with month chips, year navigation, and per-day overflow badges.
+
+![Desktop calendar](docs/media/calendar-desktop.png)
+
+**Mobile** — the same component at 390px.
+
+![Mobile calendar](docs/media/calendar-mobile.png)
+
+**Scroll mode** — `navigationMode="scroll"` renders a continuous timeline with sticky month headers instead of paged navigation.
+
+![Mobile scroll timeline](docs/media/scroll-mobile.png)
+
+**Custom day cells** — `renderDay` replaces the cell entirely while keeping calendar state.
+
+![Custom day rendering](docs/media/custom-day-desktop.png)
+
+**Headless composition** — primitives assembled by hand with your own controls.
+
+![Headless composition](docs/media/headless-desktop.png)
+
+</details>
 
 ## Installation
 
@@ -11,210 +43,177 @@ and reference playground.
 npm install react-photo-calendar
 ```
 
-`react` and `react-dom` are peer dependencies (`^18.2.0 || ^19.0.0`) — the package
-does not bundle its own copy.
-
 ```tsx
 import { PhotoCalendar } from 'react-photo-calendar';
 import 'react-photo-calendar/styles.css'; // optional reference styling
 
+const entries = [
+  { datetime: '2026-09-07T10:00:00Z', photos: ['/a.jpg', '/b.jpg'] },
+  { datetime: '2026-09-11T18:30:00Z', photos: ['/c.jpg'] },
+];
+
 export function App() {
-  return <PhotoCalendar monthKey="2030-01" />;
+  return (
+    <PhotoCalendar
+      entries={entries}
+      defaultMonthKey="2026-09"
+      onDaySelect={({ isoDate }) => console.log(isoDate)}
+    />
+  );
 }
 ```
 
-The stylesheet is optional: the primitives are headless, and `styles.css` only
+The stylesheet is optional. The primitives ship unstyled; `styles.css` only
 carries the reference UI used by the `PhotoCalendar` convenience component.
 
-## Getting started
+## Data
 
-```bash
-npm install
-npm run dev
+One entry per moment, grouped onto days by the calendar:
+
+```ts
+interface PhotoEntry {
+  datetime: string;  // ISO datetime
+  photos: string[];  // first URL becomes the day's preview
+}
 ```
 
-The Storybook dev server replaces the old Vite playground and hosts interactive
-examples for the headless primitives (`npm run storybook` is available as an explicit alias).
-See `docs/storybook-guide.md` for more details. The `build` script bundles the
-library in ESM and CJS formats and emits TypeScript declarations that match the
-contract outlined in ADR-009.
+Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 
-## Project layout
+## Props
 
-- `src/index.ts` – public exports for the library package.
-- `src/PhotoCalendar.tsx` – convenience component that composes the headless primitives with the reference UI (including the optional scroll timeline).
-- `src/components/PhotoCalendarScrollView.tsx` – mobile-first scroll navigation shell consumed when `navigationMode="scroll"`.
-- `src/primitives/` – `PhotoCalendarRoot`, `PhotoCalendarNavigation`, `PhotoCalendarWeekdays`, `PhotoCalendarMonthGrid`, and `PhotoCalendarDay` headless building blocks.
-- `src/hooks/usePhotoCalendarState.ts` – shared state hook consumed by both the convenience component and primitives.
-- `.storybook/` – Storybook configuration powered by the React + Vite framework preset.
-- `src/stories/` – Storybook stories demonstrating the default calendar and headless compositions.
-- `vite.config.ts` – configures library builds and test environment defaults.
+`PhotoCalendar` also accepts every `div` attribute.
 
-## Composing your own UI
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `entries` | `PhotoEntry[]` | `[]` | Photos to place on days |
+| `monthKey` | `string` | — | Controlled month, `YYYY-MM` |
+| `defaultMonthKey` | `string` | current month | Uncontrolled starting month |
+| `onMonthChange` | `(monthKey: string) => void` | — | Fired when the month changes |
+| `onDaySelect` | `({ isoDate, date }) => void` | — | Fired when a day is activated |
+| `onRangeChange` | `(range: VisibleRange) => void` | — | Visible bounds; use it to fetch |
+| `onVisibleMonthChange` | `(monthKey: string) => void` | — | Month scrolled into view |
+| `firstDayOfWeek` | `0`–`6` | `0` | 0 = Sunday |
+| `maxThumbnailsPerDay` | `number` | — | Thumbnails before the `+N` badge |
+| `minMonthKey` / `maxMonthKey` | `string` | — | Clamp navigation |
+| `locale` | `string` | system | Weekday and month label locale |
+| `timeZone` | `string` | system | Day-boundary time zone |
+| `navigationMode` | `'controls' \| 'scroll'` | `'controls'` | Paged or continuous timeline |
+| `scrollMaxRenderedMonths` | `number` | — | Months kept mounted in scroll mode |
+| `renderDay` | `(props: DayRenderProps) => ReactNode` | — | Replace the day cell |
+| `renderDayContent` | `(ctx: DayRenderContext) => ReactNode` | — | Replace cell contents only |
+| `renderNavigation` | `(props: NavigationRenderProps) => ReactNode` | — | Replace navigation |
+| `renderWeekdays` | `(props: WeekdayRenderProps) => ReactNode` | — | Replace weekday headers |
 
-The new primitives let you mix and match calendar state with custom controls:
+Controlled and uncontrolled both work: pass `monthKey` with `onMonthChange` to
+drive it yourself, or `defaultMonthKey` to let it manage its own state.
+
+## Fetching by visible range
+
+`onRangeChange` reports the first and last dates on screen, including the
+leading and trailing days from adjacent months:
+
+```tsx
+<PhotoCalendar
+  entries={entries}
+  onRangeChange={({ startIso, endIso }) => fetchPhotos(startIso, endIso)}
+/>
+```
+
+## Headless primitives
+
+Compose your own UI against the same state. `PhotoCalendarRoot` provides
+context; every other primitive consumes it.
 
 ```tsx
 import {
   PhotoCalendarRoot,
   PhotoCalendarNavigation,
-  PhotoCalendarNavigationLayout,
-  PhotoCalendarNavigationControls,
-  PhotoCalendarNavigationPrevMonthButton,
-  PhotoCalendarNavigationMonthChips,
-  PhotoCalendarNavigationNextMonthButton,
-  PhotoCalendarNavigationTodayButton,
   PhotoCalendarWeekdays,
   PhotoCalendarMonthGrid,
-  PhotoCalendarDay,
-  usePhotoCalendarContext,
 } from 'react-photo-calendar';
 
-function MyNavigation() {
-  const { monthLabel } = usePhotoCalendarContext('MyNavigation');
+<PhotoCalendarRoot entries={entries} defaultMonthKey="2026-09">
+  {(state) => (
+    <section role="grid" aria-label={`Photo calendar for ${state.monthLabel}`}>
+      <PhotoCalendarNavigation>
+        {(nav) => (
+          <header>
+            <button onClick={() => nav.navigateMonth(-1)} disabled={!nav.canNavigatePrevMonth}>
+              Back
+            </button>
+            <span>{nav.monthLabel}</span>
+            <button onClick={() => nav.navigateMonth(1)} disabled={!nav.canNavigateNextMonth}>
+              Forward
+            </button>
+            <button onClick={nav.goToToday}>Today</button>
+          </header>
+        )}
+      </PhotoCalendarNavigation>
 
-  return (
-    <PhotoCalendarNavigationLayout>
-      <PhotoCalendarNavigationControls>
-        <PhotoCalendarNavigationPrevMonthButton />
-        <PhotoCalendarNavigationNextMonthButton />
-        <PhotoCalendarNavigationTodayButton />
-        <span style={{ fontWeight: 600 }}>{monthLabel}</span>
-      </PhotoCalendarNavigationControls>
-      <PhotoCalendarNavigationMonthChips />
-    </PhotoCalendarNavigationLayout>
-  );
-}
-
-export function MyCalendar() {
-  return (
-    <PhotoCalendarRoot defaultMonthKey="2030-01">
-      {(state) => (
-        <div role="grid" aria-label={`Photo calendar for ${state.monthLabel}`}>
-          <MyNavigation />
-          <PhotoCalendarWeekdays />
-          <PhotoCalendarMonthGrid
-            renderDay={(props) => (
-              <PhotoCalendarDay
-                day={{
-                  ...props,
-                  defaultContent: (
-                    <div
-                      style={{
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        outline: props.isToday ? '2px solid #f97316' : 'none',
-                        outlineOffset: props.isToday ? '2px' : undefined
-                      }}
-                    >
-                      {props.defaultContent}
-                    </div>
-                  )
-                }}
-              />
-            )}
-          />
-        </div>
-      )}
-    </PhotoCalendarRoot>
-  );
-}
-```
-
-Each primitive exposes render props so you can override just the pieces you need—see `docs/photo-calendar-render-props.md` for the full contract. If you prefer to stay on the convenience component, pass `renderNavigation`, `renderWeekdays`, or `renderDay` props to inject custom controls, or keep using the legacy `renderDayContent` helper. `PhotoCalendar` continues to provide the original all-in-one experience if you don’t need custom controls.
-
-Navigation can also be assembled from the exported buttons and layout helpers (`PhotoCalendarNavigationLayout`, `PhotoCalendarNavigationPrevMonthButton`, etc.), letting you mix stock behaviour with bespoke markup without threading handlers manually.
-
-```tsx
-import { PhotoCalendar, PhotoCalendarDay } from 'react-photo-calendar';
-
-<PhotoCalendar
-  renderDay={(props) => (
-    <PhotoCalendarDay
-      day={{
-        ...props,
-        defaultContent: (
-          <div
-            style={{
-              borderRadius: '12px',
-              overflow: 'hidden',
-              outline: props.isToday ? '2px solid #f97316' : 'none',
-              outlineOffset: props.isToday ? '2px' : undefined
-            }}
-          >
-            {props.defaultContent}
-          </div>
-        )
-      }}
-    />
+      <PhotoCalendarWeekdays />
+      <PhotoCalendarMonthGrid />
+    </section>
   )}
-/>
+</PhotoCalendarRoot>
 ```
 
-Use `monthKey` + `onMonthChange` to control the visible month externally, or prefer `defaultMonthKey` for uncontrolled usage while still receiving navigation callbacks. `onDaySelect` emits both ISO and native `Date` values so consumers can open detail views, modals, or drawers.
+`PhotoCalendarMonthGrid` takes a `renderDay` prop to override cell contents, and
+a `dayStates` prop for multi-month layouts. Navigation can also be assembled from
+smaller pieces (`PhotoCalendarNavigationMonthChips`, `…TodayButton`, and friends)
+instead of a render prop.
 
-`renderDayContent` receives the same `DayRenderContext` as before plus a `defaultContent` field—return it when you want to append to the stock thumbnails/day number layout instead of replacing it outright. Theme variables are documented in `docs/photo-calendar-design-tokens.md` so you can override colours/radii without touching JSX.
+`usePhotoCalendarState` exposes the same state directly if you want no markup at
+all, and `usePhotoCalendarContext` reads it from inside a `PhotoCalendarRoot`.
 
-Once the component architecture stabilizes, this folder can be promoted into a stand-alone repository without significant changes—package metadata already assumes an eventual npm distribution.
+See [docs/photo-calendar-render-props.md](docs/photo-calendar-render-props.md)
+for the full render-prop contracts.
 
-## Mobile scroll timeline
+## Styling
 
-Set `navigationMode="scroll"` on `PhotoCalendar` (or mount `PhotoCalendarScrollView` yourself) to swap the legacy button banner for the vertically scrolling timeline. The scroll shell keeps a small window of months mounted, sticks each month header to the top edge, and emits `onVisibleMonthChange` whenever the leading month shifts—ideal for lazy-loading more photo data as users skim the timeline.
+`styles.css` is plain CSS driven by custom properties, so most theming is a
+matter of overriding tokens rather than rewriting rules:
 
-```tsx
-const loadMonth = (monthKey: string) => {
-  // trigger fetch logic here
-};
-
-export function MobileTimeline() {
-  const pending = useRef(new Set<string>());
-
-  const prefetchCluster = useCallback((key: string) => {
-    if (pending.current.has(key)) return;
-    pending.current.add(key);
-    loadMonth(key).finally(() => pending.current.delete(key));
-  }, []);
-
-  return (
-    <PhotoCalendar
-      navigationMode="scroll"
-      onVisibleMonthChange={(key) => {
-        prefetchCluster(key);
-        // grab adjacent months via scroll state helpers if needed
-      }}
-      scrollMaxRenderedMonths={7}
-    />
-  );
-}
-
-// Access scroll helpers via the context when you need neighbouring keys
-export function PrefetchingTimeline() {
-  // assumes PhotoCalendarScrollView + PhotoCalendarScrollState are imported
-  const scrollRef = useRef<PhotoCalendarScrollState | null>(null);
-
-  return (
-    <PhotoCalendarRoot
-      onVisibleMonthChange={(key) => {
-        const scroll = scrollRef.current;
-        if (!scroll) {
-          return;
-        }
-        const neighbours = [
-          scroll.getAdjacentMonthKey(key, -1),
-          key,
-          scroll.getAdjacentMonthKey(key, 1)
-        ].filter(Boolean) as string[];
-
-        neighbours.forEach(loadMonth);
-      }}
-    >
-      {(state) => {
-        scrollRef.current = state.scroll;
-        return <PhotoCalendarScrollView />;
-      }}
-    </PhotoCalendarRoot>
-  );
+```css
+:root {
+  --calendar-color-accent: #2563eb;
 }
 ```
 
-Advanced consumers can access the scroll helpers (`getMonthSnapshot`, `getAdjacentMonthKey`, `syncVisibleMonth`) exposed on `state.scroll` by rendering through `PhotoCalendarRoot`. The helpers make it easy to prefetch neighbouring months, jump to specific anchors, or compute analytics without coupling to component internals.
+See [docs/photo-calendar-design-tokens.md](docs/photo-calendar-design-tokens.md)
+for the token list. Skip the stylesheet entirely and the primitives render
+unstyled.
+
+## Development
+
+```bash
+npm install
+npm run storybook   # http://localhost:6006
+```
+
+| Script | Purpose |
+|---|---|
+| `npm test` | Vitest suite |
+| `npm run test:coverage` | Tests with coverage |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run build` | ESM + CJS bundles and declarations |
+
+Storybook is the playground; stories live in `src/stories/`. See
+[docs/storybook-guide.md](docs/storybook-guide.md).
+
+## Releasing
+
+CI runs lint, typecheck, tests and a build on every PR. To release: bump
+`version` in `package.json`, merge, then tag.
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+The tag publishes to npm via [trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+(OIDC, no stored token) and creates a GitHub release. The build fails if the tag
+and `package.json` version disagree.
+
+## License
+
+MIT
