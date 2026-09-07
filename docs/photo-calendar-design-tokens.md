@@ -13,6 +13,7 @@ The default bundle exposes a lightweight set of CSS custom properties so consume
 | `--calendar-color-chip-bg` | Background for inactive month chips | `rgba(0, 0, 0, 0.08)` |
 | `--calendar-color-chip-active-bg` | (Reserved) optional active state background | `rgba(0, 123, 255, 0.12)` |
 | `--calendar-color-chip-active-text` | (Reserved) text color for active chips | `#0051a8` |
+| `--calendar-color-cell-bg` | Background of each day cell | `var(--calendar-color-surface-muted)` |
 | `--calendar-color-day-label-bg` | Overlay behind the day number | `rgba(0, 0, 0, 0.4)` |
 | `--calendar-color-overflow-bg` | Overlay behind the “+N” badge | `rgba(0, 0, 0, 0.7)` |
 | `--calendar-radius-day` | Border radius for day buttons and thumbnails | `8px` |
@@ -22,6 +23,21 @@ The default bundle exposes a lightweight set of CSS custom properties so consume
 | `--calendar-spacing-gap` | Gap between grid cells | `0.1rem` |
 | `--calendar-font-size-weekday` | Font size for weekday headers | `0.75rem` |
 | `--calendar-font-size-day` | Font size for day numbers | `0.85rem` |
+
+## Dark theme
+
+The stylesheet ships a `.dark` block that re-points the color tokens. It is keyed
+off a `dark` class on an ancestor, usually `<html>`, which the consuming app
+toggles:
+
+```html
+<html class="dark">
+```
+
+The calendar deliberately paints no page background, so the surrounding app
+supplies one. `--calendar-color-cell-bg` follows `--calendar-color-surface-muted`
+by default and so themes automatically; override it on its own if you want day
+cells to differ from other muted surfaces.
 
 ## Overriding Tokens
 

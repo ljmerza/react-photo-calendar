@@ -35,6 +35,12 @@ The primitives assembled by hand, with your own controls.
 
 ![Headless composition](docs/media/headless-desktop.png)
 
+The bundled dark theme, which the consuming app switches on with a `dark` class on `<html>`.
+
+![Dark theme calendar](docs/media/calendar-dark.png)
+
+![Dark theme calendar on mobile](docs/media/calendar-dark-mobile.png)
+
 </details>
 
 ## Installation
@@ -178,6 +184,16 @@ matter of overriding tokens rather than rewriting rules:
   --calendar-color-accent: #2563eb;
 }
 ```
+
+A `.dark` block ships with the stylesheet and re-points those tokens. It keys off
+a `dark` class on an ancestor, so the consuming app decides when to switch:
+
+```html
+<html class="dark">
+```
+
+The calendar paints no page background of its own, in either theme, so the app
+around it supplies that.
 
 See [docs/photo-calendar-design-tokens.md](docs/photo-calendar-design-tokens.md)
 for the token list. Skip the stylesheet entirely and the primitives render
