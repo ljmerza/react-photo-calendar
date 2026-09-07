@@ -15,23 +15,23 @@ No runtime dependencies. React 18.2+ or 19 as a peer.
 
 <br>
 
-**Desktop** — the default component, with month chips, year navigation, and per-day overflow badges.
+The default component on a wide viewport, with month chips, year navigation and per-day overflow badges.
 
 ![Desktop calendar](docs/media/calendar-desktop.png)
 
-**Mobile** — the same component at 390px.
+The same component at 390px wide.
 
 ![Mobile calendar](docs/media/calendar-mobile.png)
 
-**Scroll mode** — `navigationMode="scroll"` renders a continuous timeline with sticky month headers instead of paged navigation.
+Setting `navigationMode="scroll"` swaps paged navigation for a continuous timeline with sticky month headers.
 
 ![Mobile scroll timeline](docs/media/scroll-mobile.png)
 
-**Custom day cells** — `renderDay` replaces the cell entirely while keeping calendar state.
+`renderDay` replaces the day cell entirely while the calendar keeps managing state.
 
 ![Custom day rendering](docs/media/custom-day-desktop.png)
 
-**Headless composition** — primitives assembled by hand with your own controls.
+The primitives assembled by hand, with your own controls.
 
 ![Headless composition](docs/media/headless-desktop.png)
 
@@ -159,8 +159,8 @@ import {
 
 `PhotoCalendarMonthGrid` takes a `renderDay` prop to override cell contents, and
 a `dayStates` prop for multi-month layouts. Navigation can also be assembled from
-smaller pieces (`PhotoCalendarNavigationMonthChips`, `…TodayButton`, and friends)
-instead of a render prop.
+smaller pieces such as `PhotoCalendarNavigationMonthChips` and
+`PhotoCalendarNavigationTodayButton` instead of a render prop.
 
 `usePhotoCalendarState` exposes the same state directly if you want no markup at
 all, and `usePhotoCalendarContext` reads it from inside a `PhotoCalendarRoot`.
