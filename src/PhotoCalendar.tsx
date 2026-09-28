@@ -6,6 +6,10 @@ import { PhotoCalendarWeekdays, type WeekdayRenderProps } from './primitives/Pho
 import { PhotoCalendarMonthGrid, type DayRenderProps } from './primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarDay } from './primitives/PhotoCalendarDay';
 import { PhotoCalendarScrollView } from './components/PhotoCalendarScrollView';
+import {
+  PhotoCalendarThumbnailRetryProvider,
+  type ThumbnailRetryOptions
+} from './primitives/PhotoCalendarThumbnail';
 import type { DayRenderContext, VisibleRange } from './types/calendar';
 import type { PhotoEntry } from './types/photo';
 
@@ -95,6 +99,10 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    * Maximum number of months to keep mounted when `navigationMode` is "scroll".
    */
   scrollMaxRenderedMonths?: number;
+  /**
+   * Retry thumbnails that fail to load. Defaults to 2 retries, 1s then 2s apart; `false` turns it off.
+   */
+  thumbnailRetry?: ThumbnailRetryOptions | false;
 }
 
 export function PhotoCalendar({
@@ -118,6 +126,7 @@ export function PhotoCalendar({
   children,
   navigationMode = 'controls',
   scrollMaxRenderedMonths,
+  thumbnailRetry,
   ...rest
 }: PhotoCalendarProps) {
   const calendarOptions = {
@@ -149,8 +158,15 @@ export function PhotoCalendar({
     ? (props: WeekdayRenderProps) => renderWeekdays(props)
     : undefined;
 
+  const withRetry = (calendar: ReactNode) =>
+    thumbnailRetry === undefined ? (
+      calendar
+    ) : (
+      <PhotoCalendarThumbnailRetryProvider value={thumbnailRetry}>{calendar}</PhotoCalendarThumbnailRetryProvider>
+    );
+
   if (navigationMode === 'scroll') {
-    return (
+    return withRetry(
       <PhotoCalendarRoot {...calendarOptions}>
         {() => (
           <PhotoCalendarScrollView
@@ -166,7 +182,7 @@ export function PhotoCalendar({
     );
   }
 
-  return (
+  return withRetry(
     <PhotoCalendarRoot {...calendarOptions}>
       {(state) => (
         <div role="grid" aria-label={`Photo calendar for ${state.monthLabel}`} data-view="calendar" {...rest}>
