@@ -105,6 +105,7 @@ Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 | `timeZone` | `string` | system | Day-boundary time zone |
 | `navigationMode` | `'controls' \| 'scroll'` | `'controls'` | Paged or continuous timeline |
 | `scrollMaxRenderedMonths` | `number` | — | Months kept mounted in scroll mode |
+| `thumbnailRetry` | `{ attempts?, delayMs? } \| false` | 2 retries, 1s then 2s | Retry thumbnails that fail to load |
 | `renderDay` | `(props: DayRenderProps) => ReactNode` | — | Replace the day cell |
 | `renderDayContent` | `(ctx: DayRenderContext) => ReactNode` | — | Replace cell contents only |
 | `renderNavigation` | `(props: NavigationRenderProps) => ReactNode` | — | Replace navigation |
@@ -167,6 +168,14 @@ import {
 a `dayStates` prop for multi-month layouts. Navigation can also be assembled from
 smaller pieces such as `PhotoCalendarNavigationMonthChips` and
 `PhotoCalendarNavigationTodayButton` instead of a render prop.
+
+Day thumbnails render through `PhotoCalendarThumbnail`, which retries a failed
+load: browsers never retry a broken `<img>` on their own, so a transient error
+(say, a 503 from a rate-limited image host) would otherwise leave the day
+empty. Each retry remounts the element with the same `src`, so signed URLs
+still work, and an image that runs out of retries gets `data-failed`. Use it
+in your own `renderDay` markup, and set defaults for a subtree with
+`PhotoCalendarThumbnailRetryProvider` (`value={false}` turns retrying off).
 
 `usePhotoCalendarState` exposes the same state directly if you want no markup at
 all, and `usePhotoCalendarContext` reads it from inside a `PhotoCalendarRoot`.

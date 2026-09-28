@@ -38,6 +38,13 @@ export {
   type PhotoCalendarDayProps
 } from './primitives/PhotoCalendarDay';
 export {
+  PhotoCalendarThumbnail,
+  PhotoCalendarThumbnailRetryProvider,
+  type PhotoCalendarThumbnailProps,
+  type PhotoCalendarThumbnailRetryProviderProps,
+  type ThumbnailRetryOptions
+} from './primitives/PhotoCalendarThumbnail';
+export {
   PhotoCalendarNavigationLayout,
   PhotoCalendarNavigationYearHeading,
   PhotoCalendarNavigationControls,

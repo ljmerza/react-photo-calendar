@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Fragment } from 'react';
 import { usePhotoCalendarContext } from '../context/PhotoCalendarContext';
 import { PhotoCalendarDay } from './PhotoCalendarDay';
+import { PhotoCalendarThumbnail } from './PhotoCalendarThumbnail';
 import type { DayRenderProps } from '../types/calendar';
 import type { PhotoCalendarDayState } from '../hooks/usePhotoCalendarState';
 
@@ -33,7 +34,7 @@ export function PhotoCalendarMonthGrid({ className = 'calendar-grid', renderDay,
             {visibleThumbnails.length > 0 && (
               <div className="calendar-cell-thumbnails" data-count={visibleThumbnails.length}>
                 {visibleThumbnails.map((url, thumbIndex) => (
-                  <img
+                  <PhotoCalendarThumbnail
                     key={`${cell.isoDate}-${thumbIndex}`}
                     src={url}
                     alt=""
