@@ -132,3 +132,45 @@ describe('usePhotoCalendarState today in a zone behind UTC', () => {
     expect(result.current.navigation.isTodayDisabled).toBe(true);
   });
 });
+
+describe('usePhotoCalendarState today across local midnight', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'America/New_York');
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    // 11:59pm on Sep 30 in New York.
+    vi.setSystemTime(new Date('2026-10-01T03:59:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  const todayIsos = (dayStates: ReturnType<typeof usePhotoCalendarState>['dayStates']) =>
+    dayStates.filter((day) => day.context.isToday).map((day) => day.context.isoDate);
+
+  it('moves today to the new date at local midnight while the page stays open', () => {
+    const { result } = renderHook(() => usePhotoCalendarState({ monthKey: '2026-09' }));
+    expect(todayIsos(result.current.dayStates)).toEqual(['2026-09-30']);
+    expect(result.current.navigation.isTodayDisabled).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(2 * 60 * 1000);
+    });
+
+    expect(todayIsos(result.current.dayStates)).toEqual(['2026-10-01']);
+    expect(result.current.navigation.isTodayDisabled).toBe(false);
+  });
+
+  it('catches up when the page becomes visible again after sleeping through midnight', () => {
+    const { result } = renderHook(() => usePhotoCalendarState({ monthKey: '2026-09' }));
+
+    // The clock moves on but the midnight timer has not fired, as after a laptop sleep.
+    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(todayIsos(result.current.dayStates)).toEqual(['2026-10-01']);
+  });
+});
