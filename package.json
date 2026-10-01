@@ -1,6 +1,6 @@
 {
   "name": "react-photo-calendar",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Headless, composable React month-view calendar that renders photo thumbnails per day.",
   "keywords": [
     "react",

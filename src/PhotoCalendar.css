@@ -157,6 +157,12 @@
   color: var(--calendar-color-text);
 }
 
+.month-chip--active {
+  background: var(--calendar-color-chip-active-bg);
+  color: var(--calendar-color-chip-active-text);
+  font-weight: 600;
+}
+
 .month-chip:focus-visible {
   outline: 2px solid var(--calendar-color-accent);
   outline-offset: 2px;
