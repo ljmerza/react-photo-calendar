@@ -9,6 +9,7 @@ import {
   type CalendarCell
 } from '../utils/calendar';
 import { createPhotosByDateMap } from '../utils/photos';
+import { useLocalTodayIso } from './useLocalTodayIso';
 import type { DayRenderContext, VisibleRange } from '../types/calendar';
 import type { PhotoEntry } from '../types/photo';
 
@@ -150,7 +151,7 @@ export function usePhotoCalendarState({
     };
   }, [firstDayOfWeek, weekdayShortFormatter, weekdayLongFormatter]);
   const maxThumbnails = Math.max(1, maxThumbnailsPerDay);
-  const todayIso = useMemo(() => getLocalToday().toISOString().slice(0, 10), []);
+  const todayIso = useLocalTodayIso();
 
   const handleDaySelect = useCallback(
     (cell: CalendarCell) => {
@@ -397,10 +398,11 @@ export function usePhotoCalendarState({
   );
 
   const isTodayDisabled = useMemo(() => {
-    const todayMonthDate = addMonths(getLocalToday(), 0);
+    // yyyy-mm-dd parses as UTC midnight, the form every grid date uses.
+    const todayMonthDate = addMonths(new Date(todayIso), 0);
     const clampedToday = clampToRange(todayMonthDate);
     return toComparableMonth(clampedToday) === currentMonthIndex;
-  }, [clampToRange, currentMonthIndex, toComparableMonth]);
+  }, [clampToRange, currentMonthIndex, todayIso, toComparableMonth]);
 
   const canNavigatePrevMonth = useMemo(
     () => minMonthIndex === null || currentMonthIndex > minMonthIndex,
