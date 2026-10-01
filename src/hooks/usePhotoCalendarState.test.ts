@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePhotoCalendarState } from './usePhotoCalendarState';
 
 describe('usePhotoCalendarState', () => {
@@ -92,5 +92,43 @@ describe('usePhotoCalendarState', () => {
     });
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith('2030-02'));
+  });
+});
+
+describe('usePhotoCalendarState today in a zone behind UTC', () => {
+  beforeEach(() => {
+    // 8:51pm on Sep 30 in New York is already Oct 1 in UTC.
+    vi.stubEnv('TZ', 'America/New_York');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-01T00:51:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('marks the local date as today', () => {
+    const { result } = renderHook(() => usePhotoCalendarState({ monthKey: '2026-09' }));
+    const today = result.current.dayStates.filter((day) => day.context.isToday).map((day) => day.context.isoDate);
+
+    expect(today).toEqual(['2026-09-30']);
+  });
+
+  it('opens the local month when no month is given', () => {
+    const { result } = renderHook(() => usePhotoCalendarState({}));
+
+    expect(result.current.monthKey).toBe('2026-09');
+  });
+
+  it('treats the local month as the current one for the today button', () => {
+    const { result } = renderHook(() => usePhotoCalendarState({ defaultMonthKey: '2030-01' }));
+
+    act(() => {
+      result.current.navigation.goToToday();
+    });
+
+    expect(result.current.monthKey).toBe('2026-09');
+    expect(result.current.navigation.isTodayDisabled).toBe(true);
   });
 });

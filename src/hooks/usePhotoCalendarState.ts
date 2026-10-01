@@ -3,6 +3,7 @@ import {
   addMonths,
   createCalendarCells,
   formatMonthKey,
+  getLocalToday,
   getVisibleRange,
   parseMonthKey,
   type CalendarCell
@@ -149,7 +150,7 @@ export function usePhotoCalendarState({
     };
   }, [firstDayOfWeek, weekdayShortFormatter, weekdayLongFormatter]);
   const maxThumbnails = Math.max(1, maxThumbnailsPerDay);
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => getLocalToday().toISOString().slice(0, 10), []);
 
   const handleDaySelect = useCallback(
     (cell: CalendarCell) => {
@@ -332,8 +333,7 @@ export function usePhotoCalendarState({
   );
 
   const goToToday = useCallback(() => {
-    const now = new Date();
-    const nextDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const nextDate = addMonths(getLocalToday(), 0);
     const clamped = clampToRange(nextDate);
     if (toComparableMonth(clamped) === currentMonthIndex) {
       return;
@@ -397,8 +397,7 @@ export function usePhotoCalendarState({
   );
 
   const isTodayDisabled = useMemo(() => {
-    const now = new Date();
-    const todayMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const todayMonthDate = addMonths(getLocalToday(), 0);
     const clampedToday = clampToRange(todayMonthDate);
     return toComparableMonth(clampedToday) === currentMonthIndex;
   }, [clampToRange, currentMonthIndex, toComparableMonth]);
