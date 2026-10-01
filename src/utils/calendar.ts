@@ -5,10 +5,18 @@ export interface CalendarCell {
   inCurrentMonth: boolean;
 }
 
+/**
+ * The viewer's local calendar date, as UTC midnight like every other grid date.
+ * Reading the UTC clock instead would put "today" on tomorrow in the evening in
+ * zones behind UTC.
+ */
+export function getLocalToday(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+}
+
 export function parseMonthKey(value?: string): Date {
   if (!value) {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return addMonths(getLocalToday(), 0);
   }
 
   const [yearStr = '', monthStr = ''] = value.split('-');
@@ -16,8 +24,7 @@ export function parseMonthKey(value?: string): Date {
   const monthIndex = Number(monthStr) - 1;
 
   if (Number.isNaN(year) || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return addMonths(getLocalToday(), 0);
   }
 
   return new Date(Date.UTC(year, monthIndex, 1));
