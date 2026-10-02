@@ -206,6 +206,88 @@ describe('PhotoCalendarVirtualScrollView', () => {
     expect(renderedMonthKeys()).toContain('2024-06');
     expect(onMonthChange).not.toHaveBeenCalled();
   });
+
+  it('keeps month headers as plain text without onMonthHeaderClick', () => {
+    render(<PhotoCalendar monthKey="2027-01" navigationMode="virtual" virtualHeight={CONTAINER_HEIGHT} />);
+    settle();
+
+    const header = monthSection('2027-01')?.querySelector('.calendar-month-header');
+    expect(header?.tagName).toBe('DIV');
+    expect(header?.id).toBe('calendar-month-2027-01-header');
+    expect(header?.classList.contains('calendar-month-header--interactive')).toBe(false);
+    expect(getTimeline().querySelector('button.calendar-month-header')).toBeNull();
+    expect(monthSection('2027-01')?.getAttribute('aria-labelledby')).toBe('calendar-month-2027-01-header');
+  });
+
+  it('makes month headers buttons that report their month', () => {
+    const onMonthHeaderClick = vi.fn();
+    const onMonthChange = vi.fn();
+    render(
+      <PhotoCalendar
+        monthKey="2027-01"
+        navigationMode="virtual"
+        virtualHeight={CONTAINER_HEIGHT}
+        onMonthHeaderClick={onMonthHeaderClick}
+        onMonthChange={onMonthChange}
+      />
+    );
+    settle();
+
+    const january = screen.getByRole('button', { name: 'January 2027, choose month' });
+    expect(january.classList.contains('calendar-month-header')).toBe(true);
+    expect(january.classList.contains('calendar-month-header--interactive')).toBe(true);
+    expect(january.getAttribute('type')).toBe('button');
+    expect(january.getAttribute('aria-current')).toBe('date');
+    fireEvent.click(january);
+    expect(onMonthHeaderClick).toHaveBeenCalledWith('2027-01');
+
+    fireEvent.click(screen.getByRole('button', { name: 'February 2027, choose month' }));
+    expect(onMonthHeaderClick).toHaveBeenLastCalledWith('2027-02');
+    // Tapping a header only reports it; the calendar does not move on its own.
+    expect(onMonthChange).not.toHaveBeenCalled();
+
+    // The section is still named by the month alone.
+    expect(monthSection('2027-01')?.getAttribute('aria-labelledby')).toBe('calendar-month-2027-01-header');
+    expect(document.getElementById('calendar-month-2027-01-header')?.textContent).toBe('January 2027');
+  });
+
+  it('lets the month header button label be overridden', () => {
+    render(
+      <PhotoCalendar
+        monthKey="2027-01"
+        navigationMode="virtual"
+        virtualHeight={CONTAINER_HEIGHT}
+        onMonthHeaderClick={() => {}}
+        monthHeaderLabel={(label, key) => `Jump from ${label} (${key})`}
+      />
+    );
+    settle();
+
+    expect(screen.getByRole('button', { name: 'Jump from January 2027 (2027-01)' })).toBeTruthy();
+  });
+
+  it('calls the latest onMonthHeaderClick after a re-render', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = render(
+      <PhotoCalendar monthKey="2027-01" navigationMode="virtual" virtualHeight={CONTAINER_HEIGHT} onMonthHeaderClick={first} />
+    );
+    settle();
+    rerender(
+      <PhotoCalendar monthKey="2027-01" navigationMode="virtual" virtualHeight={CONTAINER_HEIGHT} onMonthHeaderClick={second} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /January 2027/ }));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith('2027-01');
+  });
+
+  it('does not pass the header props to the paged calendar as DOM attributes', () => {
+    render(<PhotoCalendar monthKey="2027-01" onMonthHeaderClick={() => {}} monthHeaderLabel={(label) => label} />);
+    const grid = screen.getByRole('grid', { name: /photo calendar for/i });
+    expect(grid.hasAttribute('onmonthheaderclick')).toBe(false);
+    expect(grid.hasAttribute('monthheaderlabel')).toBe(false);
+  });
 });
 
 describe('PhotoCalendarVirtualScrollView with page scrolling, newest first', () => {

@@ -34,6 +34,8 @@ it for `virtualSettleDelayMs`, so flinging across years loads nothing on the way
 `onMonthChange` reports the month at the top with `{ source: 'scroll' }`.
 `navigationMode="auto"` uses it below 875px and the paged controls above.
 Its side padding is the `--calendar-virtual-padding-x` CSS variable (default `1rem`).
+Pass `onMonthHeaderClick` to make its sticky month headers buttons (with a small chevron) that
+report their month, e.g. to open a month picker; `monthHeaderLabel` sets their accessible name.
 
 `renderDay` replaces the day cell entirely while the calendar keeps managing state.
 
@@ -119,6 +121,8 @@ Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 | `virtualOrder` | `'oldest-first' \| 'newest-first'` | `'oldest-first'` | Virtual mode: month order top to bottom |
 | `virtualSettleDelayMs` | `number` | `150` | Time a month must stay in view before its photos load |
 | `onMonthsInViewChange` | `(monthKeys: string[]) => void` | — | Virtual mode: months that settled in view; fetch their entries |
+| `onMonthHeaderClick` | `(monthKey: string) => void` | — | Virtual mode: makes month headers buttons that report their month |
+| `monthHeaderLabel` | `(monthLabel: string, monthKey: string) => string` | `"<month>, choose month"` | Virtual mode: accessible name of a month header button |
 | `thumbnailRetry` | `{ attempts?, delayMs? } \| false` | 2 retries, 1s then 2s | Retry thumbnails that fail to load |
 | `renderDay` | `(props: DayRenderProps) => ReactNode` | — | Replace the day cell |
 | `renderDayContent` | `(ctx: DayRenderContext) => ReactNode` | — | Replace cell contents only |

@@ -62,6 +62,16 @@ export interface PhotoCalendarVirtualScrollViewProps extends HTMLAttributes<HTML
    * Fired with the rendered months (visible plus overscan) once scrolling settles. Fetch their entries here.
    */
   onMonthsInViewChange?: (monthKeys: string[]) => void;
+  /**
+   * Makes each month header a button and fires with its month (yyyy-mm) when it is tapped or activated
+   * from the keyboard. Without it the headers stay plain, non-interactive text.
+   */
+  onMonthHeaderClick?: (monthKey: string) => void;
+  /**
+   * Accessible name of a month header button. Defaults to "<month label>, choose month".
+   * Only used with `onMonthHeaderClick`.
+   */
+  monthHeaderLabel?: (monthLabel: string, monthKey: string) => string;
 }
 
 const DEFAULT_RANGE = 120;
@@ -71,6 +81,10 @@ const DEFAULT_SETTLE_DELAY_MS = 150;
 const ESTIMATED_CHROME_PX = 130;
 const FALLBACK_LIST_WIDTH_PX = 360;
 const MIN_FILL_HEIGHT_PX = 320;
+
+function defaultMonthHeaderLabel(monthLabel: string) {
+  return `${monthLabel}, choose month`;
+}
 
 function combineClassName(base: string, additional?: string) {
   return additional ? `${base} ${additional}` : base;
@@ -104,6 +118,9 @@ interface VirtualMonthProps {
   measureRef: (node: HTMLElement | null) => void;
   renderDay?: (props: DayRenderProps) => ReactNode;
   renderWeekdays?: (props: WeekdayRenderProps) => ReactNode;
+  /** Set together with `onHeaderClick` to render the header as a button. */
+  headerLabel?: string;
+  onHeaderClick?: (monthKey: string) => void;
 }
 
 const VirtualMonth = memo(function VirtualMonth({
@@ -114,10 +131,13 @@ const VirtualMonth = memo(function VirtualMonth({
   isSettled,
   measureRef,
   renderDay,
-  renderWeekdays
+  renderWeekdays,
+  headerLabel,
+  onHeaderClick
 }: VirtualMonthProps) {
   const dayStates = useMemo(() => withVisiblePhotos(snapshot.dayStates, isSettled), [snapshot.dayStates, isSettled]);
   const headerId = `calendar-month-${snapshot.monthKey}-header`;
+  const headerClassName = combineClassName('calendar-month-header', isActive ? 'calendar-month-header--active' : undefined);
 
   return (
     <section
@@ -130,13 +150,24 @@ const VirtualMonth = memo(function VirtualMonth({
       style={{ top: start }}
       aria-labelledby={headerId}
     >
-      <div
-        id={headerId}
-        className={combineClassName('calendar-month-header', isActive ? 'calendar-month-header--active' : undefined)}
-        aria-current={isActive ? 'date' : undefined}
-      >
-        <strong>{snapshot.monthLabel}</strong>
-      </div>
+      {onHeaderClick ? (
+        // The whole sticky bar is the tap target. The section is labelled by the month text alone,
+        // not by the button's longer accessible name.
+        <button
+          type="button"
+          className={`${headerClassName} calendar-month-header--interactive`}
+          aria-current={isActive ? 'date' : undefined}
+          aria-label={headerLabel}
+          onClick={() => onHeaderClick(snapshot.monthKey)}
+        >
+          <strong id={headerId}>{snapshot.monthLabel}</strong>
+          <span className="calendar-month-header-chevron" aria-hidden="true" />
+        </button>
+      ) : (
+        <div id={headerId} className={headerClassName} aria-current={isActive ? 'date' : undefined}>
+          <strong>{snapshot.monthLabel}</strong>
+        </div>
+      )}
       <PhotoCalendarWeekdays>{renderWeekdays}</PhotoCalendarWeekdays>
       <PhotoCalendarMonthGrid renderDay={renderDay} dayStates={dayStates} />
     </section>
@@ -161,6 +192,8 @@ export function PhotoCalendarVirtualScrollView({
   settleDelayMs = DEFAULT_SETTLE_DELAY_MS,
   overscan = 1,
   onMonthsInViewChange,
+  onMonthHeaderClick,
+  monthHeaderLabel = defaultMonthHeaderLabel,
   className,
   style,
   ...rest
@@ -285,8 +318,11 @@ export function PhotoCalendarVirtualScrollView({
   const activeItem = isAtEnd ? undefined : virtualizer.getVirtualItemForOffset(scrollOffset + 1);
   const activeKey = isAtEnd ? monthKeys[monthKeys.length - 1] : activeItem ? monthKeys[activeItem.index] : monthKey;
 
-  const latestRef = useRef({ renderedKeys, activeKey, monthKey, scroll, onMonthsInViewChange });
-  latestRef.current = { renderedKeys, activeKey, monthKey, scroll, onMonthsInViewChange };
+  const latestRef = useRef({ renderedKeys, activeKey, monthKey, scroll, onMonthsInViewChange, onMonthHeaderClick });
+  latestRef.current = { renderedKeys, activeKey, monthKey, scroll, onMonthsInViewChange, onMonthHeaderClick };
+  // Stable, so an inline onMonthHeaderClick does not re-render every mounted month.
+  const handleHeaderClick = useCallback((key: string) => latestRef.current.onMonthHeaderClick?.(key), []);
+  const headersInteractive = onMonthHeaderClick !== undefined;
   // Month keys this view reported through syncVisibleMonth; their echo through
   // the monthKey prop must not scroll the list again.
   const emittedKeysRef = useRef<Set<string>>(new Set());
@@ -389,10 +425,11 @@ export function PhotoCalendarVirtualScrollView({
       >
         {items.map((item) => {
           const key = monthKeys[item.index];
+          const snapshot = getSnapshot(key);
           return (
             <VirtualMonth
               key={item.key}
-              snapshot={getSnapshot(key)}
+              snapshot={snapshot}
               index={item.index}
               start={item.start - (isWindowScroll ? scrollMargin : 0)}
               isActive={key === activeKey}
@@ -400,6 +437,8 @@ export function PhotoCalendarVirtualScrollView({
               measureRef={virtualizer.measureElement}
               renderDay={renderDay}
               renderWeekdays={renderWeekdays}
+              headerLabel={headersInteractive ? monthHeaderLabel(snapshot.monthLabel, key) : undefined}
+              onHeaderClick={headersInteractive ? handleHeaderClick : undefined}
             />
           );
         })}

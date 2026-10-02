@@ -122,6 +122,46 @@
   color: #fff;
 }
 
+/* Virtual timeline with onMonthHeaderClick: the header is a button that looks like the plain header. */
+.calendar-month-header--interactive {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 0;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.calendar-month-header--interactive:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
+}
+
+/* A small down chevron in the header's own colour. */
+.calendar-month-header-chevron {
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-25%) rotate(45deg);
+  opacity: 0.7;
+}
+
+@media (hover: hover) {
+  .calendar-month-header--interactive:hover .calendar-month-header-chevron {
+    opacity: 1;
+  }
+}
+
 /* Mobile: Hide year row */
 .calendar-year-row {
   display: none;
