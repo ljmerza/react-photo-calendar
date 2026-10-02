@@ -60,3 +60,7 @@ export {
   PhotoCalendarScrollView,
   type PhotoCalendarScrollViewProps
 } from './components/PhotoCalendarScrollView';
+export {
+  PhotoCalendarVirtualScrollView,
+  type PhotoCalendarVirtualScrollViewProps
+} from './components/PhotoCalendarVirtualScrollView';

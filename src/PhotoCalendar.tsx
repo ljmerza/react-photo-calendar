@@ -7,13 +7,22 @@ import { PhotoCalendarMonthGrid, type DayRenderProps } from './primitives/PhotoC
 import { PhotoCalendarDay } from './primitives/PhotoCalendarDay';
 import { PhotoCalendarScrollView } from './components/PhotoCalendarScrollView';
 import {
+  PhotoCalendarVirtualScrollView,
+  type PhotoCalendarVirtualScrollViewProps,
+  type VirtualMonthRange
+} from './components/PhotoCalendarVirtualScrollView';
+import { useMediaQuery } from './hooks/useMediaQuery';
+import {
   PhotoCalendarThumbnailRetryProvider,
   type ThumbnailRetryOptions
 } from './primitives/PhotoCalendarThumbnail';
-import type { DayRenderContext, VisibleRange } from './types/calendar';
+import type { DayRenderContext, MonthChangeInfo, VisibleRange } from './types/calendar';
 import type { PhotoEntry } from './types/photo';
 
-export type { DayRenderContext, PhotoEntry, VisibleRange };
+export type { DayRenderContext, MonthChangeInfo, PhotoEntry, VirtualMonthRange, VisibleRange };
+
+// Matches the stylesheet's desktop breakpoint, where the banner shows year navigation and month chips.
+const WIDE_SCREEN_QUERY = '(min-width: 875px)';
 
 export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
   /**
@@ -25,9 +34,10 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    */
   defaultMonthKey?: string;
   /**
-   * Fired when navigation arrows request a month change. Receives ISO yyyy-mm strings.
+   * Fired when the visible month changes. Receives the ISO yyyy-mm string and whether
+   * navigation controls or scrolling a timeline caused it.
    */
-  onMonthChange?: (nextMonthKey: string) => void;
+  onMonthChange?: (nextMonthKey: string, info: MonthChangeInfo) => void;
   /**
    * Fired when the user activates a day cell. Receives the ISO date (yyyy-mm-dd) and native `Date` instance.
    */
@@ -91,14 +101,34 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    */
   children?: ReactNode;
   /**
-   * Switch between legacy control navigation and the mobile scroll timeline.
-   * Defaults to "controls" for backward compatibility.
+   * How the user moves between months:
+   * - "controls": one month with arrows, year buttons and month chips (default).
+   * - "scroll": a windowed timeline of stacked months.
+   * - "virtual": a virtualized timeline spanning years; photos load only for months the user stops on.
+   * - "auto": "virtual" below 875px wide, "controls" from 875px up.
    */
-  navigationMode?: 'controls' | 'scroll';
+  navigationMode?: 'controls' | 'scroll' | 'virtual' | 'auto';
   /**
    * Maximum number of months to keep mounted when `navigationMode` is "scroll".
    */
   scrollMaxRenderedMonths?: number;
+  /**
+   * Months the virtual timeline lists around today's month. Defaults to 120 on each side.
+   */
+  virtualRange?: VirtualMonthRange;
+  /**
+   * Height of the virtual timeline. "fill" (default) stretches it to the bottom of the viewport.
+   */
+  virtualHeight?: PhotoCalendarVirtualScrollViewProps['height'];
+  /**
+   * How long months must stay in view before their photos load in the virtual timeline. Default 150ms.
+   */
+  virtualSettleDelayMs?: number;
+  /**
+   * Virtual timeline only: fired with the months on screen (plus one either side) once scrolling settles.
+   * Load entries for these months.
+   */
+  onMonthsInViewChange?: (monthKeys: string[]) => void;
   /**
    * Retry thumbnails that fail to load. Defaults to 2 retries, 1s then 2s apart; `false` turns it off.
    */
@@ -126,9 +156,15 @@ export function PhotoCalendar({
   children,
   navigationMode = 'controls',
   scrollMaxRenderedMonths,
+  virtualRange,
+  virtualHeight,
+  virtualSettleDelayMs,
+  onMonthsInViewChange,
   thumbnailRetry,
   ...rest
 }: PhotoCalendarProps) {
+  const isWideScreen = useMediaQuery(WIDE_SCREEN_QUERY, true);
+  const resolvedMode = navigationMode === 'auto' ? (isWideScreen ? 'controls' : 'virtual') : navigationMode;
   const calendarOptions = {
     monthKey,
     defaultMonthKey,
@@ -165,7 +201,28 @@ export function PhotoCalendar({
       <PhotoCalendarThumbnailRetryProvider value={thumbnailRetry}>{calendar}</PhotoCalendarThumbnailRetryProvider>
     );
 
-  if (navigationMode === 'scroll') {
+  if (resolvedMode === 'virtual') {
+    return withRetry(
+      <PhotoCalendarRoot {...calendarOptions}>
+        {() => (
+          <PhotoCalendarVirtualScrollView
+            {...rest}
+            renderDay={resolvedRenderDay}
+            renderWeekdays={resolvedWeekdays}
+            firstDayOfWeek={firstDayOfWeek}
+            range={virtualRange}
+            height={virtualHeight}
+            settleDelayMs={virtualSettleDelayMs}
+            onMonthsInViewChange={onMonthsInViewChange}
+          >
+            {children}
+          </PhotoCalendarVirtualScrollView>
+        )}
+      </PhotoCalendarRoot>
+    );
+  }
+
+  if (resolvedMode === 'scroll') {
     return withRetry(
       <PhotoCalendarRoot {...calendarOptions}>
         {() => (

@@ -20,7 +20,7 @@ export default defineConfig({
       cssFileName: 'photo-calendar'
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: ['react', 'react-dom', '@tanstack/react-virtual'],
       output: {
         globals: {
           react: 'React',

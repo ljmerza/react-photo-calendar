@@ -134,6 +134,33 @@ export const MobileScrollNavigation = () => (
   </div>
 );
 
+// Two years of photos, so the virtual timeline has something to load on the way.
+const twoYearsOfEntries: PhotoEntry[] = Array.from({ length: 24 }, (_, offset) => {
+  const date = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - offset, 1));
+  return createMonthEntries(date.getUTCFullYear(), date.getUTCMonth());
+}).flat();
+
+export const VirtualScrollNavigation = () => (
+  <div
+    style={{
+      maxWidth: 420,
+      margin: '0 auto',
+      borderRadius: 16,
+      border: '1px solid rgba(0,0,0,0.1)',
+      overflow: 'hidden',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+    }}
+  >
+    <PhotoCalendar
+      defaultMonthKey={currentMonthKey}
+      entries={twoYearsOfEntries}
+      navigationMode="virtual"
+      virtualHeight={640}
+      virtualRange={{ before: 24, after: 0 }}
+    />
+  </div>
+);
+
 export const NavigationPrimitives = () => (
   <PhotoCalendarRoot entries={sampleEntries} defaultMonthKey={currentMonthKey}>
     {() => (

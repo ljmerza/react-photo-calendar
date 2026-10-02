@@ -27,6 +27,13 @@ Setting `navigationMode="scroll"` swaps paged navigation for a continuous timeli
 
 ![Mobile scroll timeline](docs/media/scroll-mobile.png)
 
+`navigationMode="virtual"` is a timeline built for long histories. It lists years of months
+but mounts only the ones on screen, and a month's photos load only after the user stops on
+it for `virtualSettleDelayMs`, so flinging across years loads nothing on the way.
+`onMonthsInViewChange` reports the months that settled so you can fetch their entries, and
+`onMonthChange` reports the month at the top with `{ source: 'scroll' }`.
+`navigationMode="auto"` uses it below 875px and the paged controls above.
+
 `renderDay` replaces the day cell entirely while the calendar keeps managing state.
 
 ![Custom day rendering](docs/media/custom-day-desktop.png)
@@ -94,7 +101,7 @@ Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 | `entries` | `PhotoEntry[]` | `[]` | Photos to place on days |
 | `monthKey` | `string` | — | Controlled month, `YYYY-MM` |
 | `defaultMonthKey` | `string` | current month | Uncontrolled starting month |
-| `onMonthChange` | `(monthKey: string) => void` | — | Fired when the month changes |
+| `onMonthChange` | `(monthKey: string, info: { source: 'navigation' \| 'scroll' }) => void` | — | Fired when the month changes |
 | `onDaySelect` | `({ isoDate, date }) => void` | — | Fired when a day is activated |
 | `onRangeChange` | `(range: VisibleRange) => void` | — | Visible bounds; use it to fetch |
 | `onVisibleMonthChange` | `(monthKey: string) => void` | — | Month scrolled into view |
@@ -103,8 +110,12 @@ Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 | `minMonthKey` / `maxMonthKey` | `string` | — | Clamp navigation |
 | `locale` | `string` | system | Weekday and month label locale |
 | `timeZone` | `string` | system | Day-boundary time zone |
-| `navigationMode` | `'controls' \| 'scroll'` | `'controls'` | Paged or continuous timeline |
+| `navigationMode` | `'controls' \| 'scroll' \| 'virtual' \| 'auto'` | `'controls'` | Paged, timeline, virtualized timeline, or virtual below 875px |
 | `scrollMaxRenderedMonths` | `number` | — | Months kept mounted in scroll mode |
+| `virtualRange` | `{ before?, after? }` | 120 each | Months listed around today in virtual mode |
+| `virtualHeight` | `'fill' \| CSS height` | `'fill'` | Virtual timeline height; `'fill'` reaches the bottom of the viewport |
+| `virtualSettleDelayMs` | `number` | `150` | Time a month must stay in view before its photos load |
+| `onMonthsInViewChange` | `(monthKeys: string[]) => void` | — | Virtual mode: months that settled in view; fetch their entries |
 | `thumbnailRetry` | `{ attempts?, delayMs? } \| false` | 2 retries, 1s then 2s | Retry thumbnails that fail to load |
 | `renderDay` | `(props: DayRenderProps) => ReactNode` | — | Replace the day cell |
 | `renderDayContent` | `(ctx: DayRenderContext) => ReactNode` | — | Replace cell contents only |

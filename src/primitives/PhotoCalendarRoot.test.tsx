@@ -46,7 +46,7 @@ describe('PhotoCalendarRoot and primitives', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'custom next' }));
-    expect(monthChange).toHaveBeenCalledWith('2030-02');
+    expect(monthChange).toHaveBeenCalledWith('2030-02', { source: 'navigation' });
   });
 
   it('passes day render context to PhotoCalendarMonthGrid render prop', () => {
