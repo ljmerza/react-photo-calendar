@@ -65,7 +65,7 @@ describe('PhotoCalendar', () => {
 
     const nextButton = getEnabledButton(/next month/i);
     fireEvent.click(nextButton);
-    expect(spy).toHaveBeenCalledWith('2030-02');
+    expect(spy).toHaveBeenCalledWith('2030-02', { source: 'navigation' });
   });
 
   it('respects min and max month bounds', () => {
@@ -83,7 +83,7 @@ describe('PhotoCalendar', () => {
     const nextButton = getEnabledButton(/next month/i);
 
     fireEvent.click(prevButton);
-    expect(spy).toHaveBeenLastCalledWith('2030-05');
+    expect(spy).toHaveBeenLastCalledWith('2030-05', { source: 'navigation' });
 
     fireEvent.click(prevButton);
     expect(spy.mock.calls.map((args) => args[0])).not.toContain('2030-03');
@@ -225,7 +225,7 @@ describe('PhotoCalendar', () => {
 
     const customButton = screen.getByRole('button', { name: /custom navigation for/i });
     fireEvent.click(customButton);
-    expect(monthChange).toHaveBeenCalledWith('2030-02');
+    expect(monthChange).toHaveBeenCalledWith('2030-02', { source: 'navigation' });
   });
 
   it('passes weekday labels to renderWeekdays override', () => {

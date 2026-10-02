@@ -7,6 +7,11 @@ export interface VisibleRange {
   endIso: string;
 }
 
+export interface MonthChangeInfo {
+  /** "scroll" when a scrolling timeline moved to the month; "navigation" for buttons, chips and today. */
+  source: 'navigation' | 'scroll';
+}
+
 export interface DayRenderContext {
   date: Date;
   isoDate: string;

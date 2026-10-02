@@ -10,13 +10,13 @@ import {
 } from '../utils/calendar';
 import { createPhotosByDateMap } from '../utils/photos';
 import { useLocalTodayIso } from './useLocalTodayIso';
-import type { DayRenderContext, VisibleRange } from '../types/calendar';
+import type { DayRenderContext, MonthChangeInfo, VisibleRange } from '../types/calendar';
 import type { PhotoEntry } from '../types/photo';
 
 export interface UsePhotoCalendarStateOptions {
   monthKey?: string;
   defaultMonthKey?: string;
-  onMonthChange?: (nextMonthKey: string) => void;
+  onMonthChange?: (nextMonthKey: string, info: MonthChangeInfo) => void;
   onDaySelect?: (info: { isoDate: string; date: Date }) => void;
   firstDayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   entries?: PhotoEntry[];
@@ -280,12 +280,12 @@ export function usePhotoCalendarState({
   );
 
   const commitMonthChange = useCallback(
-    (nextDate: Date) => {
+    (nextDate: Date, source: MonthChangeInfo['source'] = 'navigation') => {
       const nextKey = formatMonthKey(nextDate);
       if (nextKey === effectiveMonthKey) {
         return;
       }
-      onMonthChange?.(nextKey);
+      onMonthChange?.(nextKey, { source });
       if (!isControlled) {
         setInternalMonthKey(nextKey);
       }
@@ -384,7 +384,7 @@ export function usePhotoCalendarState({
     (monthKeyValue: string) => {
       const nextDate = parseMonthKey(monthKeyValue);
       const clamped = clampToRange(nextDate);
-      commitMonthChange(clamped);
+      commitMonthChange(clamped, 'scroll');
     },
     [clampToRange, commitMonthChange]
   );
