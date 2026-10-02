@@ -121,6 +121,14 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    */
   virtualHeight?: PhotoCalendarVirtualScrollViewProps['height'];
   /**
+   * What scrolls the virtual timeline: its own container ("container", default) or the page ("window").
+   */
+  virtualScroll?: PhotoCalendarVirtualScrollViewProps['scrollTarget'];
+  /**
+   * Month order of the virtual timeline: "oldest-first" (default) or "newest-first".
+   */
+  virtualOrder?: PhotoCalendarVirtualScrollViewProps['order'];
+  /**
    * How long months must stay in view before their photos load in the virtual timeline. Default 150ms.
    */
   virtualSettleDelayMs?: number;
@@ -158,6 +166,8 @@ export function PhotoCalendar({
   scrollMaxRenderedMonths,
   virtualRange,
   virtualHeight,
+  virtualScroll,
+  virtualOrder,
   virtualSettleDelayMs,
   onMonthsInViewChange,
   thumbnailRetry,
@@ -212,6 +222,8 @@ export function PhotoCalendar({
             firstDayOfWeek={firstDayOfWeek}
             range={virtualRange}
             height={virtualHeight}
+            scrollTarget={virtualScroll}
+            order={virtualOrder}
             settleDelayMs={virtualSettleDelayMs}
             onMonthsInViewChange={onMonthsInViewChange}
           >

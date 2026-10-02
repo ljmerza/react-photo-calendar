@@ -1,6 +1,6 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer, useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePhotoCalendarContext } from '../context/PhotoCalendarContext';
 import { PhotoCalendarMonthGrid } from '../primitives/PhotoCalendarMonthGrid';
 import { PhotoCalendarWeekdays, type WeekdayRenderProps } from '../primitives/PhotoCalendarWeekdays';
@@ -38,8 +38,17 @@ export interface PhotoCalendarVirtualScrollViewProps extends HTMLAttributes<HTML
   range?: VirtualMonthRange;
   /**
    * Height of the scroll container. "fill" (the default) stretches it from its top edge to the bottom of the viewport.
+   * Ignored when `scrollTarget` is "window".
    */
   height?: 'fill' | CSSProperties['height'];
+  /**
+   * What scrolls: the timeline's own container (default), or the page. Either way only the visible months are mounted.
+   */
+  scrollTarget?: 'container' | 'window';
+  /**
+   * Month order: "oldest-first" (default) scrolls down into the future; "newest-first" scrolls down into the past.
+   */
+  order?: 'oldest-first' | 'newest-first';
   /**
    * How long the visible months must stay put before their photos load and the active month is reported.
    * Scrolling past a month faster than this never loads its images. Default 150ms.
@@ -147,6 +156,8 @@ export function PhotoCalendarVirtualScrollView({
   firstDayOfWeek = 0,
   range,
   height = 'fill',
+  scrollTarget = 'container',
+  order = 'oldest-first',
   settleDelayMs = DEFAULT_SETTLE_DELAY_MS,
   overscan = 1,
   onMonthsInViewChange,
@@ -185,10 +196,14 @@ export function PhotoCalendarVirtualScrollView({
       keys.push(key);
       rows.push(countWeekRows(parseMonthKey(key), firstDayOfWeek));
     }
+    if (order === 'newest-first') {
+      keys.reverse();
+      rows.reverse();
+    }
     return { monthKeys: keys, weekRows: rows, indexByKey: new Map(keys.map((key, index) => [key, index])) };
     // monthKey only matters when no month is within bounds; firstKey/lastKey already track it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstKey, lastKey, firstDayOfWeek, isMonthWithinBounds, clampMonthKey]);
+  }, [firstKey, lastKey, firstDayOfWeek, order, isMonthWithinBounds, clampMonthKey]);
 
   const indexForMonth = useCallback(
     (key: string) => indexByKey.get(key) ?? indexByKey.get(clampMonthKey(key)) ?? 0,
@@ -204,13 +219,46 @@ export function PhotoCalendarVirtualScrollView({
   );
   const getItemKey = useCallback((index: number) => monthKeys[index], [monthKeys]);
 
-  const virtualizer = useVirtualizer({
+  // Distance from the top of the page to the list, which page scrolling has to account for.
+  const isWindowScroll = scrollTarget === 'window';
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    if (!isWindowScroll) return;
+    const measure = () => {
+      const list = listRef.current;
+      if (!list) return;
+      const margin = Math.round(list.getBoundingClientRect().top + window.scrollY);
+      setScrollMargin((previous) => (previous === margin ? previous : margin));
+    };
+    measure();
+    // Content above the list (a header that wraps, a control that loads late) changes the page's size.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(document.documentElement);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [isWindowScroll]);
+
+  // Both hooks always run (hooks can't be conditional); only the one for the scroll target is enabled.
+  const containerVirtualizer = useVirtualizer({
     count: monthKeys.length,
     getScrollElement: () => containerRef.current,
     estimateSize,
     getItemKey,
-    overscan
+    overscan,
+    enabled: !isWindowScroll
   });
+  const windowVirtualizer = useWindowVirtualizer({
+    count: monthKeys.length,
+    estimateSize,
+    getItemKey,
+    overscan,
+    scrollMargin,
+    enabled: isWindowScroll
+  });
+  const virtualizer = isWindowScroll ? windowVirtualizer : containerVirtualizer;
 
   // Snapshots are rebuilt only when the calendar data changes, not on every scroll frame.
   const snapshotCacheRef = useRef({ source: getMonthSnapshot, byKey: new Map<string, PhotoCalendarMonthSnapshot>() });
@@ -247,7 +295,7 @@ export function PhotoCalendarVirtualScrollView({
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!container || height !== 'fill') return;
+    if (!container || height !== 'fill' || isWindowScroll) return;
     const fill = () => {
       const top = container.getBoundingClientRect().top + window.scrollY;
       container.style.height = `${Math.max(MIN_FILL_HEIGHT_PX, window.innerHeight - top)}px`;
@@ -257,14 +305,18 @@ export function PhotoCalendarVirtualScrollView({
     // The height stays on cleanup: unsetting it, even briefly (StrictMode re-runs
     // effects), lets the container grow to its content and resets its scroll position.
     return () => window.removeEventListener('resize', fill);
-  }, [height]);
+  }, [height, isWindowScroll]);
 
   // Open on the requested month. Runs after the fill effect so the container already has its height,
   // and on every mount (StrictMode mounts twice), not once per instance.
   const alignToMonthRef = useRef(() => {});
   alignToMonthRef.current = () => {
+    const index = indexForMonth(monthKey);
+    // The first month is already in place. Scrolling to it would push anything above
+    // the list (a page title, say) off screen when the page scrolls.
+    if (index === 0) return;
     jumpingRef.current = true;
-    virtualizer.scrollToIndex(indexForMonth(monthKey), { align: 'start' });
+    virtualizer.scrollToIndex(index, { align: 'start' });
   };
   useLayoutEffect(() => {
     alignToMonthRef.current();
@@ -324,10 +376,17 @@ export function PhotoCalendarVirtualScrollView({
       ref={containerRef}
       role={role}
       aria-label={ariaLabel}
-      className={combineClassName('calendar-virtual-container', className)}
-      style={height === 'fill' ? style : { height, ...style }}
+      className={combineClassName(
+        isWindowScroll ? 'calendar-virtual-container calendar-virtual-container--window' : 'calendar-virtual-container',
+        className
+      )}
+      style={height === 'fill' || isWindowScroll ? style : { height, ...style }}
     >
-      <div ref={listRef} className="calendar-virtual-list" style={{ height: virtualizer.getTotalSize() }}>
+      <div
+        ref={listRef}
+        className="calendar-virtual-list"
+        style={{ height: virtualizer.getTotalSize() - (isWindowScroll ? scrollMargin : 0) }}
+      >
         {items.map((item) => {
           const key = monthKeys[item.index];
           return (
@@ -335,7 +394,7 @@ export function PhotoCalendarVirtualScrollView({
               key={item.key}
               snapshot={getSnapshot(key)}
               index={item.index}
-              start={item.start}
+              start={item.start - (isWindowScroll ? scrollMargin : 0)}
               isActive={key === activeKey}
               isSettled={settledKeys.has(key)}
               measureRef={virtualizer.measureElement}

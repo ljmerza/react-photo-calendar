@@ -87,6 +87,11 @@
   margin: 0 calc(-1 * var(--calendar-virtual-padding-x));
 }
 
+/* Page scrolling: the page is the scroller, so the timeline neither scrolls nor clips. */
+.calendar-virtual-container--window {
+  overflow: visible;
+}
+
 .calendar-virtual-list {
   position: relative;
   width: 100%;
