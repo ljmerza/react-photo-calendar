@@ -19,6 +19,7 @@
   --calendar-spacing-gap: 0.1rem;
   --calendar-font-size-weekday: 0.75rem;
   --calendar-font-size-day: 0.85rem;
+  --calendar-virtual-padding-x: 1rem;
 }
 
 /* Dark theme (the app toggles a `dark` class on <html>) */
@@ -76,9 +77,14 @@
 .calendar-virtual-container {
   position: relative;
   overflow-y: auto;
-  padding: 0 1rem;
+  padding: 0 var(--calendar-virtual-padding-x);
   -webkit-overflow-scrolling: touch;
   background: var(--calendar-color-surface);
+}
+
+/* Sticky month headers reach across the timeline's side padding. */
+.calendar-virtual-container .calendar-month-header {
+  margin: 0 calc(-1 * var(--calendar-virtual-padding-x));
 }
 
 .calendar-virtual-list {
