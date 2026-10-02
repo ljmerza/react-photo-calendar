@@ -33,6 +33,7 @@ it for `virtualSettleDelayMs`, so flinging across years loads nothing on the way
 `onMonthsInViewChange` reports the months that settled so you can fetch their entries, and
 `onMonthChange` reports the month at the top with `{ source: 'scroll' }`.
 `navigationMode="auto"` uses it below 875px and the paged controls above.
+Its side padding is the `--calendar-virtual-padding-x` CSS variable (default `1rem`).
 
 `renderDay` replaces the day cell entirely while the calendar keeps managing state.
 
