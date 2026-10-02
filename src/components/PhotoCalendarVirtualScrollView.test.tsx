@@ -208,6 +208,80 @@ describe('PhotoCalendarVirtualScrollView', () => {
   });
 });
 
+describe('PhotoCalendarVirtualScrollView with page scrolling, newest first', () => {
+  let pageScrollY = 0;
+  const originalScrollTo = window.scrollTo;
+  const originalScrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+  const originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+
+  beforeEach(() => {
+    pageScrollY = 0;
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => pageScrollY });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: CONTAINER_HEIGHT });
+    window.scrollTo = ((options?: ScrollToOptions | number) => {
+      pageScrollY = typeof options === 'object' ? options.top ?? 0 : 0;
+      window.dispatchEvent(new Event('scroll'));
+    }) as typeof window.scrollTo;
+  });
+
+  afterEach(() => {
+    window.scrollTo = originalScrollTo;
+    if (originalScrollY) Object.defineProperty(window, 'scrollY', originalScrollY);
+    else delete (window as { scrollY?: number }).scrollY;
+    if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight);
+  });
+
+  function scrollPageTo(top: number) {
+    act(() => {
+      pageScrollY = top;
+      window.dispatchEvent(new Event('scroll'));
+    });
+  }
+
+  const renderTimeline = (props: { monthKey: string; onMonthChange?: () => void }) =>
+    render(
+      <PhotoCalendar
+        {...props}
+        maxMonthKey="2027-06"
+        navigationMode="virtual"
+        virtualScroll="window"
+        virtualOrder="newest-first"
+      />
+    );
+
+  it('lists the newest month first and leaves the page at the top when opening on it', () => {
+    renderTimeline({ monthKey: '2027-06' });
+    settle();
+
+    const keys = renderedMonthKeys();
+    expect(keys[0]).toBe('2027-06');
+    expect(keys[1]).toBe('2027-05');
+    expect(window.scrollY).toBe(0);
+    expect(getTimeline().classList.contains('calendar-virtual-container--window')).toBe(true);
+  });
+
+  it('scrolls the page to an older month it opens on', () => {
+    renderTimeline({ monthKey: '2027-01' });
+    settle();
+
+    expect(window.scrollY).toBeGreaterThan(0);
+    expect(renderedMonthKeys()).toContain('2027-01');
+    expect(getTimeline().querySelector('[aria-current="date"]')?.textContent).toMatch(/January 2027/);
+  });
+
+  it('reports the older month the page scrolled down to', () => {
+    const onMonthChange = vi.fn();
+    renderTimeline({ monthKey: '2027-06', onMonthChange });
+    settle();
+
+    // Two months down the page, newest first, is April.
+    scrollPageTo(parseFloat(monthSection('2027-04')?.style.top ?? '0') + 10);
+    settle();
+
+    expect(onMonthChange).toHaveBeenCalledWith('2027-04', { source: 'scroll' });
+  });
+});
+
 describe('navigationMode="auto"', () => {
   function stubWidth(isWide: boolean) {
     vi.stubGlobal(

@@ -115,6 +115,8 @@ Days show up to `maxThumbnailsPerDay` thumbnails and a `+N` badge for the rest.
 | `scrollMaxRenderedMonths` | `number` | — | Months kept mounted in scroll mode |
 | `virtualRange` | `{ before?, after? }` | 120 each | Months listed around today in virtual mode |
 | `virtualHeight` | `'fill' \| CSS height` | `'fill'` | Virtual timeline height; `'fill'` reaches the bottom of the viewport |
+| `virtualScroll` | `'container' \| 'window'` | `'container'` | Virtual mode: scroll inside the timeline, or with the page |
+| `virtualOrder` | `'oldest-first' \| 'newest-first'` | `'oldest-first'` | Virtual mode: month order top to bottom |
 | `virtualSettleDelayMs` | `number` | `150` | Time a month must stay in view before its photos load |
 | `onMonthsInViewChange` | `(monthKeys: string[]) => void` | — | Virtual mode: months that settled in view; fetch their entries |
 | `thumbnailRetry` | `{ attempts?, delayMs? } \| false` | 2 retries, 1s then 2s | Retry thumbnails that fail to load |
