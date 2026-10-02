@@ -254,20 +254,21 @@ export function PhotoCalendarVirtualScrollView({
     };
     fill();
     window.addEventListener('resize', fill);
-    return () => {
-      window.removeEventListener('resize', fill);
-      container.style.height = '';
-    };
+    // The height stays on cleanup: unsetting it, even briefly (StrictMode re-runs
+    // effects), lets the container grow to its content and resets its scroll position.
+    return () => window.removeEventListener('resize', fill);
   }, [height]);
 
-  // Open on the requested month. Runs after the fill effect so the container already has its height.
-  const alignedRef = useRef(false);
-  useLayoutEffect(() => {
-    if (alignedRef.current) return;
-    alignedRef.current = true;
+  // Open on the requested month. Runs after the fill effect so the container already has its height,
+  // and on every mount (StrictMode mounts twice), not once per instance.
+  const alignToMonthRef = useRef(() => {});
+  alignToMonthRef.current = () => {
     jumpingRef.current = true;
     virtualizer.scrollToIndex(indexForMonth(monthKey), { align: 'start' });
-  }, [indexForMonth, monthKey, virtualizer]);
+  };
+  useLayoutEffect(() => {
+    alignToMonthRef.current();
+  }, []);
 
   // Follow monthKey changes that did not come from scrolling this list.
   const previousMonthKeyRef = useRef(monthKey);
