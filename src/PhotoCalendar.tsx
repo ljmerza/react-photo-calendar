@@ -138,6 +138,15 @@ export interface PhotoCalendarProps extends HTMLAttributes<HTMLDivElement> {
    */
   onMonthsInViewChange?: (monthKeys: string[]) => void;
   /**
+   * Virtual timeline only: makes each sticky month header a button that fires with its month (yyyy-mm),
+   * e.g. to open a month picker. Without it the headers are plain text.
+   */
+  onMonthHeaderClick?: (monthKey: string) => void;
+  /**
+   * Virtual timeline only: accessible name of a month header button. Defaults to "<month label>, choose month".
+   */
+  monthHeaderLabel?: (monthLabel: string, monthKey: string) => string;
+  /**
    * Retry thumbnails that fail to load. Defaults to 2 retries, 1s then 2s apart; `false` turns it off.
    */
   thumbnailRetry?: ThumbnailRetryOptions | false;
@@ -170,6 +179,8 @@ export function PhotoCalendar({
   virtualOrder,
   virtualSettleDelayMs,
   onMonthsInViewChange,
+  onMonthHeaderClick,
+  monthHeaderLabel,
   thumbnailRetry,
   ...rest
 }: PhotoCalendarProps) {
@@ -226,6 +237,8 @@ export function PhotoCalendar({
             order={virtualOrder}
             settleDelayMs={virtualSettleDelayMs}
             onMonthsInViewChange={onMonthsInViewChange}
+            onMonthHeaderClick={onMonthHeaderClick}
+            monthHeaderLabel={monthHeaderLabel}
           >
             {children}
           </PhotoCalendarVirtualScrollView>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   PhotoCalendar,
   PhotoCalendarRoot,
@@ -160,6 +161,36 @@ export const VirtualScrollNavigation = () => (
     />
   </div>
 );
+
+// onMonthHeaderClick turns each sticky month header into a button, e.g. to open a month picker.
+export const VirtualTappableMonthHeaders = () => {
+  const [tapped, setTapped] = useState<string | null>(null);
+  return (
+    <div
+      style={{
+        maxWidth: 420,
+        margin: '0 auto',
+        borderRadius: 16,
+        border: '1px solid rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+      }}
+    >
+      <p style={{ margin: 0, padding: '0.75rem 1rem', fontSize: 14 }}>
+        {tapped ? `Header tapped: ${tapped}` : 'Tap a month header'}
+      </p>
+      <PhotoCalendar
+        defaultMonthKey={currentMonthKey}
+        entries={twoYearsOfEntries}
+        navigationMode="virtual"
+        virtualHeight={600}
+        virtualRange={{ before: 24, after: 0 }}
+        onMonthHeaderClick={setTapped}
+        monthHeaderLabel={(label) => `${label}, jump to month`}
+      />
+    </div>
+  );
+};
 
 export const NavigationPrimitives = () => (
   <PhotoCalendarRoot entries={sampleEntries} defaultMonthKey={currentMonthKey}>
